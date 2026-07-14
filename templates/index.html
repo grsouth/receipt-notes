@@ -1,0 +1,846 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#14110f">
+    <title>Receipt Notes</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    <style media="not all">
+      :root {
+        color-scheme: light;
+        --ink: #17324d;
+        --muted: #677586;
+        --paper: #fffdf5;
+        --canvas: #e9e4d9;
+        --sidebar: #f4f0e7;
+        --line: #d7d0c1;
+        --accent: #e65b42;
+        --accent-dark: #bd402d;
+        --success: #1f7250;
+        --danger: #a63e35;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+      body { margin: 0; min-width: 320px; background: var(--canvas); color: var(--ink); }
+      button, input, textarea { font: inherit; }
+      a { color: inherit; }
+
+      .app-shell {
+        display: grid;
+        grid-template-columns: 18.5rem minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        max-height: 100vh;
+        padding: .75rem .65rem;
+        overflow-y: auto;
+        background: var(--sidebar);
+        border-right: 1px solid var(--line);
+      }
+
+      .sidebar-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: .4rem;
+        margin-bottom: .65rem;
+        padding: 0 .1rem .7rem;
+        border-bottom: 1px solid var(--line);
+      }
+      .sidebar-action {
+        display: grid;
+        place-items: center;
+        min-height: 2.2rem;
+        padding: .45rem .55rem;
+        border: 1px solid #c9c1b3;
+        border-radius: .45rem;
+        background: #fff9;
+        color: var(--ink);
+        cursor: pointer;
+        font-size: .76rem;
+        font-weight: 700;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: border-color .12s, background .12s;
+      }
+      .sidebar-action:hover { border-color: var(--accent); background: #fff; }
+
+      .folder-icon {
+        position: relative;
+        flex: 0 0 auto;
+        width: .92rem;
+        height: .66rem;
+        border-radius: .12rem;
+        background: #d5a843;
+      }
+      .folder-icon::before {
+        position: absolute;
+        top: -.22rem;
+        left: .08rem;
+        width: .42rem;
+        height: .25rem;
+        border-radius: .12rem .12rem 0 0;
+        background: #d5a843;
+        content: "";
+      }
+      .tree-list { display: grid; gap: .08rem; margin: 0; padding: 0; list-style: none; }
+      .tree-list .tree-list {
+        margin-left: .72rem;
+        padding-left: .52rem;
+        border-left: 1px solid #d6cfc1;
+      }
+      .tree-drop-zone { flex: 1; min-height: 6rem; border-radius: .5rem; transition: background .12s, box-shadow .12s; }
+      .tree-drop-zone.root-drop-target { background: #e65b420d; box-shadow: inset 0 0 0 1px #e65b4266; }
+      .tree-item { min-width: 0; }
+      .tree-folder > summary {
+        display: flex;
+        align-items: center;
+        gap: .42rem;
+        min-height: 2rem;
+        padding: .35rem .45rem;
+        border-radius: .45rem;
+        color: #45566a;
+        cursor: pointer;
+        font: 600 .8rem/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+        list-style: none;
+        user-select: none;
+      }
+      .tree-folder > summary::-webkit-details-marker { display: none; }
+      .tree-folder > summary:hover { background: #fff9; color: var(--ink); }
+      .tree-folder > summary[draggable="true"], .tree-file[draggable="true"] { cursor: grab; }
+      .tree-folder > summary[draggable="true"]:active, .tree-file[draggable="true"]:active { cursor: grabbing; }
+      .tree-folder > summary.drop-target { background: #f9ded6; color: var(--accent-dark); box-shadow: inset 0 0 0 1px #e65b4266; }
+      .tree-folder.proposed-folder > summary { opacity: .58; font-style: italic; }
+      .tree-chevron {
+        flex: 0 0 auto;
+        width: .35rem;
+        color: #89929d;
+        font-size: .7rem;
+        transition: transform .12s;
+      }
+      .tree-folder[open] > summary .tree-chevron { transform: rotate(90deg); }
+      .tree-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .file-icon {
+        position: relative;
+        flex: 0 0 auto;
+        width: .72rem;
+        height: .9rem;
+        border: 1px solid #89929d;
+        border-radius: .08rem;
+        opacity: .8;
+      }
+      .file-icon::after {
+        position: absolute;
+        right: .1rem;
+        bottom: .18rem;
+        left: .1rem;
+        height: 1px;
+        background: #89929d;
+        box-shadow: 0 -.2rem 0 #89929d;
+        content: "";
+      }
+      .tree-file {
+        display: flex;
+        align-items: center;
+        gap: .48rem;
+        overflow: hidden;
+        min-height: 2rem;
+        padding: .35rem .45rem .35rem 1.2rem;
+        border-radius: .45rem;
+        color: #45566a;
+        font: .79rem/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+        text-decoration: none;
+      }
+      .tree-file:hover { background: #fff9; color: var(--ink); }
+      .tree-file.active { background: var(--ink); color: white; box-shadow: 0 .2rem .65rem #17324d20; }
+      .tree-file.active .file-icon { border-color: white; }
+      .tree-file.active .file-icon::after { background: white; box-shadow: 0 -.2rem 0 white; }
+      .tree-file.proposed { border: 1px dashed #b9b2a4; opacity: .62; font-style: italic; cursor: default; }
+      .tree-file.dragging, .tree-folder > summary.dragging { opacity: .35; }
+      .tree-empty { margin: .2rem 0 .35rem 1.2rem; color: #9a9489; font: italic .7rem/1.3 ui-monospace, monospace; }
+
+      dialog {
+        width: min(28rem, calc(100vw - 2rem));
+        padding: 0;
+        border: 1px solid #bfb7a8;
+        border-radius: .8rem;
+        background: #fffaf1;
+        color: var(--ink);
+        box-shadow: 0 1.2rem 3rem #17324d35;
+      }
+      dialog::backdrop { background: #17324d55; backdrop-filter: blur(2px); }
+      .directory-form { display: grid; gap: 1rem; padding: 1.2rem; }
+      .directory-form h3 { margin: 0; font: 700 1.2rem/1.1 Georgia, serif; }
+      .directory-form label { display: grid; gap: .4rem; font-size: .76rem; font-weight: 800; text-transform: uppercase; }
+      .directory-form input { width: 100%; padding: .7rem .8rem; border: 1px solid #bfb7a8; border-radius: .5rem; background: white; color: var(--ink); font: .86rem ui-monospace, monospace; }
+      .dialog-actions { display: flex; justify-content: flex-end; gap: .5rem; }
+
+      .workspace { min-width: 0; padding: 2rem clamp(1rem, 4vw, 4rem) 3rem; }
+      .workspace-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 2rem;
+        max-width: 64rem;
+        margin: 0 auto 1.5rem;
+      }
+      .eyebrow { margin: 0 0 .35rem; color: var(--accent-dark); font-size: .72rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+      .workspace h2 { margin: 0; font: 700 clamp(1.55rem, 3vw, 2.25rem)/1.1 Georgia, serif; }
+      .save-state { color: var(--muted); font-size: .8rem; white-space: nowrap; }
+      .save-state.unsaved { color: var(--accent-dark); font-weight: 700; }
+
+      .notice {
+        max-width: 64rem;
+        margin: 0 auto 1rem;
+        padding: .75rem 1rem;
+        border-radius: .65rem;
+        font-size: .86rem;
+      }
+      .notice.success { background: #dcefe5; color: var(--success); }
+      .notice.error { background: #f8ded8; color: var(--danger); }
+
+      .note-form { max-width: 64rem; margin: 0 auto; }
+      .path-row { display: grid; gap: .42rem; margin-bottom: 1.25rem; }
+      .path-row label { font-size: .76rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+      .path-input-wrap { position: relative; max-width: 38rem; }
+      .path-prefix { position: absolute; top: 50%; left: .8rem; transform: translateY(-50%); color: var(--muted); font: .8rem ui-monospace, monospace; pointer-events: none; }
+      .path-row input {
+        width: 100%;
+        padding: .72rem .9rem .72rem 2.15rem;
+        border: 1px solid #bfb7a8;
+        border-radius: .62rem;
+        outline: none;
+        background: #fffaf1;
+        color: var(--ink);
+        font: .88rem ui-monospace, SFMono-Regular, Consolas, monospace;
+        box-shadow: 0 1px 0 #fff inset;
+      }
+      .path-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 .2rem #e65b4220; }
+
+      .editor-stage {
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: clamp(1rem, 4vw, 2.25rem);
+        border: 1px solid #cbc3b4;
+        border-radius: 1rem;
+        background-color: #ded8cc;
+        background-image: radial-gradient(#9f988b44 .7px, transparent .7px);
+        background-size: 5px 5px;
+        box-shadow: 0 .7rem 2rem #4c453b14 inset;
+      }
+
+      .receipt {
+        position: relative;
+        width: min(100%, 39rem);
+        padding: 1.5rem clamp(1rem, 4vw, 2rem) 1.25rem;
+        background: var(--paper);
+        box-shadow: 0 .8rem 2rem #544c3f2c, 0 1px 0 #fff inset;
+      }
+      .receipt::before, .receipt::after {
+        position: absolute;
+        right: 0;
+        left: 0;
+        height: .45rem;
+        content: "";
+        background: linear-gradient(135deg, transparent 50%, var(--paper) 50%) 0 0 / .75rem .75rem repeat-x;
+      }
+      .receipt::before { top: -.44rem; transform: rotate(180deg); }
+      .receipt::after { bottom: -.44rem; }
+
+      .receipt-header, .receipt-footer { display: flex; justify-content: space-between; gap: 1rem; color: #746f65; font: 700 .68rem/1 ui-monospace, monospace; letter-spacing: .08em; }
+      .receipt-header { padding-bottom: 1rem; border-bottom: 1px dashed #b9b2a4; }
+      .ruler { overflow: hidden; margin: .85rem 0 .35rem; color: #aaa397; font: .68rem/1 ui-monospace, monospace; white-space: nowrap; user-select: none; }
+      .receipt textarea {
+        display: block;
+        box-sizing: content-box;
+        width: 48ch;
+        max-width: 100%;
+        min-height: 24rem;
+        margin: 0 auto;
+        padding: .65rem 0;
+        resize: vertical;
+        overflow-x: hidden;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: #252a2f;
+        caret-color: var(--accent);
+        font: 1rem/1.42 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+        white-space: pre-wrap;
+      }
+      .receipt textarea::placeholder { color: #aaa397; }
+      .receipt-footer { padding-top: .8rem; border-top: 1px dashed #b9b2a4; }
+      .ascii-warning { color: var(--danger); }
+
+      .form-actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.25rem; }
+      .shortcut { color: var(--muted); font-size: .76rem; }
+      kbd { padding: .12rem .35rem; border: 1px solid #bfb7a8; border-bottom-width: 2px; border-radius: .3rem; background: #f8f4eb; font: .7rem ui-monospace, monospace; }
+      .button-group { display: flex; gap: .65rem; }
+      .button {
+        padding: .72rem 1rem;
+        border: 1px solid transparent;
+        border-radius: .65rem;
+        cursor: pointer;
+        font-size: .86rem;
+        font-weight: 800;
+        transition: transform .12s, box-shadow .12s, background .12s;
+      }
+      .button:hover { transform: translateY(-1px); }
+      .button:active { transform: translateY(0); }
+      .button.secondary { border-color: #bfb7a8; background: #fffaf1; color: var(--ink); }
+      .button.primary { background: var(--accent); color: white; box-shadow: 0 .3rem .8rem #bd402d2c; }
+      .button.primary:hover { background: var(--accent-dark); }
+
+      @media (max-width: 760px) {
+        .app-shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+        .sidebar { align-self: start; min-height: 0; max-height: 16rem; padding-bottom: .65rem; border-right: 0; border-bottom: 1px solid var(--line); }
+        .workspace { padding: 1.35rem .8rem 2.5rem; }
+        .workspace-header { align-items: flex-start; }
+        .editor-stage { padding: 1rem .5rem; }
+        .receipt { padding-right: .75rem; padding-left: .75rem; }
+        .receipt textarea { box-sizing: border-box; width: 100%; }
+        .form-actions { align-items: flex-end; }
+      }
+
+      @media (max-width: 470px) {
+        .workspace-header { display: block; }
+        .save-state { display: block; margin-top: .6rem; }
+        .form-actions { align-items: stretch; flex-direction: column; }
+        .button-group { display: grid; grid-template-columns: 1fr 1fr; }
+        .shortcut { order: 2; text-align: center; }
+      }
+    </style>
+  </head>
+  <body>
+    {% macro render_tree(items) -%}
+      <ul class="tree-list">
+        {% for item in items %}
+          <li class="tree-item"{% if item.proposed %} data-proposed-node="true"{% endif %}>
+            {% if item.kind == "folder" %}
+              <details class="tree-folder{% if item.proposed %} proposed-folder{% endif %}" data-tree-path="{{ item.path }}" open>
+                <summary
+                  title="{% if item.proposed %}Unsaved location: {% endif %}{{ item.path }}"
+                  {% if not item.proposed %}draggable="true" data-drag-path="{{ item.path }}" data-folder-drop-path="{{ item.path }}"{% endif %}
+                >
+                  <span class="tree-chevron" aria-hidden="true">▶</span>
+                  <span class="folder-icon" aria-hidden="true"></span>
+                  <span class="tree-label">{{ item.name }}</span>
+                </summary>
+                {% if item.children %}
+                  {{ render_tree(item.children) }}
+                {% else %}
+                  <div class="tree-empty">empty folder</div>
+                {% endif %}
+              </details>
+              {% if not item.proposed %}
+                <button
+                  class="tree-delete"
+                  type="button"
+                  aria-label="Delete folder {{ item.name }}"
+                  title="Delete folder"
+                  data-delete-path="{{ item.path }}"
+                  data-delete-name="{{ item.name }}"
+                  data-delete-kind="folder"
+                >×</button>
+              {% endif %}
+            {% else %}
+              {% if item.proposed %}
+                <span class="tree-file proposed" title="Unsaved location: {{ item.path }}">
+                  <span class="file-icon" aria-hidden="true"></span>
+                  <span class="tree-label">{{ item.name }}</span>
+                </span>
+              {% else %}
+                <a
+                  class="tree-file{% if is_saved and item.path == selected_path %} active{% endif %}"
+                  href="/?path={{ item.path|urlencode }}"
+                  title="{{ item.path }}"
+                  draggable="true"
+                  data-drag-path="{{ item.path }}"
+                >
+                  <span class="file-icon" aria-hidden="true"></span>
+                  <span class="tree-label">{{ item.name }}</span>
+                </a>
+              {% endif %}
+              {% if not item.proposed %}
+                <button
+                  class="tree-delete"
+                  type="button"
+                  aria-label="Delete note {{ item.name }}"
+                  title="Delete note"
+                  data-delete-path="{{ item.path }}"
+                  data-delete-name="{{ item.name }}"
+                  data-delete-kind="note"
+                >×</button>
+              {% endif %}
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {%- endmacro %}
+
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-actions">
+          <a class="sidebar-action" href="/" aria-label="New note" title="New note">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M12 4H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-7"></path>
+              <path d="M17.5 2.5a2.12 2.12 0 0 1 3 3L11 15l-4 1 1-4Z"></path>
+            </svg>
+          </a>
+          <button class="sidebar-action" id="new-directory-button" type="button" aria-label="New directory" title="New directory">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path>
+              <path d="M12 14h6M15 11v6"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="tree-drop-zone" id="tree-drop-zone">
+          {{ render_tree(note_tree) }}
+        </div>
+      </aside>
+
+      <dialog id="directory-dialog">
+        <form class="directory-form" method="post" action="/directory">
+          <h3>New directory</h3>
+          <label for="directory-name">
+            Name
+            <input id="directory-name" name="name" required autocomplete="off">
+          </label>
+          <input name="parent" type="hidden" value="{{ note_directory }}">
+          <input name="current_path" type="hidden" value="{{ original_path }}">
+          <div class="dialog-actions">
+            <button class="button secondary" id="cancel-directory" type="button">Cancel</button>
+            <button class="button primary" type="submit">Create directory</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="delete-dialog">
+        <form class="directory-form" method="post" action="/delete">
+          <h3 id="delete-heading">Delete item?</h3>
+          <p class="delete-warning" id="delete-warning"></p>
+          <input id="delete-path" name="path" type="hidden">
+          <input id="delete-current-path" name="current_path" type="hidden">
+          <input name="confirm" type="hidden" value="delete">
+          <div class="dialog-actions">
+            <button class="button secondary" id="cancel-delete" type="button">Cancel</button>
+            <button class="button danger" type="submit">Delete</button>
+          </div>
+        </form>
+      </dialog>
+
+      <main class="workspace">
+        <form class="note-form" id="note-form" method="post">
+          <div class="editor-bar">
+            <span class="printer-status disconnected" id="printer-status" role="status">
+              <span class="printer-status-dot" aria-hidden="true"></span>
+              <span id="printer-status-label">Printer disconnected</span>
+            </span>
+          </div>
+          <div class="path-row">
+            <label for="title">Title</label>
+            <div class="path-input-wrap">
+              <input
+                id="title"
+                name="title"
+                value="{{ note_title }}"
+                placeholder="untitled"
+                required
+                autocomplete="off"
+              >
+              <input id="note-directory" name="directory" type="hidden" value="{{ note_directory }}">
+              <input name="original_path" type="hidden" value="{{ original_path }}">
+            </div>
+          </div>
+
+          <div class="format-row" aria-label="Receipt text format">
+            <fieldset class="format-group">
+              <legend>Font</legend>
+              <label class="format-option">
+                <input type="radio" name="font" value="a" {% if style.font == "a" %}checked{% endif %}>
+                <span>A</span>
+              </label>
+              <label class="format-option">
+                <input type="radio" name="font" value="b" {% if style.font == "b" %}checked{% endif %}>
+                <span>B</span>
+              </label>
+            </fieldset>
+
+            <fieldset class="format-group size-options">
+              <legend>Size</legend>
+              <label class="format-option">
+                <input type="radio" name="size" value="normal" {% if style.size == "normal" %}checked{% endif %}>
+                <span>Normal</span>
+              </label>
+              <label class="format-option">
+                <input type="radio" name="size" value="double-width" {% if style.size == "double-width" %}checked{% endif %}>
+                <span>2W</span>
+              </label>
+              <label class="format-option">
+                <input type="radio" name="size" value="double-height" {% if style.size == "double-height" %}checked{% endif %}>
+                <span>2H</span>
+              </label>
+              <label class="format-option">
+                <input type="radio" name="size" value="double" {% if style.size == "double" %}checked{% endif %}>
+                <span>2×</span>
+              </label>
+            </fieldset>
+          </div>
+
+          <div class="editor-stage">
+            <div class="receipt" id="receipt" data-font="{{ style.font }}" data-width="{{ style.width }}" data-height="{{ style.height }}">
+              <div class="receipt-viewport">
+                <label for="content" class="sr-only">Note content</label>
+                <textarea
+                  id="content"
+                  name="content"
+                  cols="{{ columns }}"
+                  wrap="hard"
+                  spellcheck="false"
+                  autocapitalize="off"
+                  autofocus
+                  placeholder="Type a small note..."
+                >{{ content }}</textarea>
+              </div>
+            </div>
+          </div>
+
+          <p class="ascii-warning" id="ascii-warning" role="alert" hidden>Receipt notes support printable ASCII only.</p>
+
+          <div class="form-actions">
+            <span class="save-state" id="save-state">Ready</span>
+            <div class="button-group">
+              <button class="button secondary" id="save-button" type="submit" formaction="/save">Save</button>
+              <button class="button primary" type="submit" formaction="/print">Print</button>
+            </div>
+          </div>
+        </form>
+
+        {% if message %}<div class="notice success" role="status">{{ message }}</div>{% endif %}
+        {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+      </main>
+    </div>
+
+    <script>
+      const form = document.querySelector("#note-form");
+      const titleInput = document.querySelector("#title");
+      const noteDirectory = document.querySelector("#note-directory");
+      const content = document.querySelector("#content");
+      const saveButton = document.querySelector("#save-button");
+      const saveState = document.querySelector("#save-state");
+      const receipt = document.querySelector("#receipt");
+      const printerStatus = document.querySelector("#printer-status");
+      const printerStatusLabel = document.querySelector("#printer-status-label");
+      const fontInputs = Array.from(document.querySelectorAll('input[name="font"]'));
+      const sizeInputs = Array.from(document.querySelectorAll('input[name="size"]'));
+      const asciiWarning = document.querySelector("#ascii-warning");
+      const directoryDialog = document.querySelector("#directory-dialog");
+      const directoryName = document.querySelector("#directory-name");
+      const deleteDialog = document.querySelector("#delete-dialog");
+      const deleteHeading = document.querySelector("#delete-heading");
+      const deleteWarning = document.querySelector("#delete-warning");
+      const deletePath = document.querySelector("#delete-path");
+      const deleteCurrentPath = document.querySelector("#delete-current-path");
+      const treeDropZone = document.querySelector("#tree-drop-zone");
+      const originalSavedPath = {{ (selected_path if is_saved else "")|tojson }};
+      const fontMetrics = { a: { columns: 42 }, b: { columns: 56 } };
+      const sizeMetrics = {
+        normal: { width: 1, height: 1, label: "NORMAL" },
+        "double-width": { width: 2, height: 1, label: "DOUBLE WIDTH" },
+        "double-height": { width: 1, height: 2, label: "DOUBLE HEIGHT" },
+        double: { width: 2, height: 2, label: "DOUBLE SIZE" },
+      };
+
+      function selectedFormat() {
+        const font = fontInputs.find((input) => input.checked)?.value || "a";
+        const size = sizeInputs.find((input) => input.checked)?.value || "normal";
+        return { font, size, ...sizeMetrics[size] };
+      }
+
+      function currentValue() {
+        const format = selectedFormat();
+        return `${titleInput.value}\u0000${content.value}\u0000${format.font}\u0000${format.size}`;
+      }
+
+      const initialValue = currentValue();
+
+      async function updatePrinterStatus() {
+        try {
+          const response = await fetch("/printer-status", { headers: { "Accept": "application/json" } });
+          if (!response.ok) throw new Error("Printer status unavailable");
+          const status = await response.json();
+          printerStatus.classList.toggle("connected", status.connected);
+          printerStatus.classList.toggle("disconnected", !status.connected);
+          printerStatusLabel.textContent = status.label;
+        } catch (_) {
+          printerStatus.classList.remove("connected");
+          printerStatus.classList.add("disconnected");
+          printerStatusLabel.textContent = "Printer disconnected";
+        }
+      }
+
+      document.querySelector("#new-directory-button").addEventListener("click", () => {
+        directoryDialog.showModal();
+        directoryName.focus();
+      });
+      document.querySelector("#cancel-directory").addEventListener("click", () => directoryDialog.close());
+      document.querySelector("#cancel-delete").addEventListener("click", () => deleteDialog.close());
+
+      const treeStateKey = "receipt-notes:open-folders";
+      let openFolders = {};
+      try { openFolders = JSON.parse(localStorage.getItem(treeStateKey) || "{}"); } catch (_) {}
+      document.querySelectorAll(".tree-folder:not(.proposed-folder)").forEach((folder) => {
+        const folderPath = folder.dataset.treePath;
+        if (Object.prototype.hasOwnProperty.call(openFolders, folderPath)) {
+          folder.open = openFolders[folderPath];
+        }
+        folder.addEventListener("toggle", () => {
+          openFolders[folderPath] = folder.open;
+          localStorage.setItem(treeStateKey, JSON.stringify(openFolders));
+        });
+      });
+
+      function directTreeList(parent) {
+        return Array.from(parent.children).find((child) => child.classList.contains("tree-list"));
+      }
+
+      function makeIcon(className) {
+        const icon = document.createElement("span");
+        icon.className = className;
+        icon.setAttribute("aria-hidden", "true");
+        return icon;
+      }
+
+      function makeProposedFolder(name, folderPath) {
+        const item = document.createElement("li");
+        item.className = "tree-item";
+        item.dataset.proposedNode = "true";
+
+        const folder = document.createElement("details");
+        folder.className = "tree-folder proposed-folder";
+        folder.dataset.treePath = folderPath;
+        folder.open = true;
+
+        const summary = document.createElement("summary");
+        summary.title = `Unsaved location: ${folderPath}`;
+        const chevron = document.createElement("span");
+        chevron.className = "tree-chevron";
+        chevron.setAttribute("aria-hidden", "true");
+        chevron.textContent = "▶";
+        const label = document.createElement("span");
+        label.className = "tree-label";
+        label.textContent = name;
+        summary.append(chevron, makeIcon("folder-icon"), label);
+
+        const children = document.createElement("ul");
+        children.className = "tree-list";
+        folder.append(summary, children);
+        item.append(folder);
+        return { item, folder, children };
+      }
+
+      function makeProposedFile(name, notePath) {
+        const item = document.createElement("li");
+        item.className = "tree-item";
+        item.dataset.proposedNode = "true";
+        const file = document.createElement("span");
+        file.className = "tree-file proposed";
+        file.title = `Unsaved location: ${notePath}`;
+        const label = document.createElement("span");
+        label.className = "tree-label";
+        label.textContent = name;
+        file.append(makeIcon("file-icon"), label);
+        item.append(file);
+        return item;
+      }
+
+      function updateProposedLocation() {
+        document.querySelectorAll('[data-proposed-node="true"]').forEach((node) => node.remove());
+        const normalizedTitle = titleInput.value.trim().replace(/\.txt$/i, "").trim();
+        if (!normalizedTitle || normalizedTitle === "." || normalizedTitle === ".." || /[\\/]/.test(normalizedTitle)) return;
+        const proposedPath = noteDirectory.value
+          ? `${noteDirectory.value}/${normalizedTitle}.txt`
+          : `${normalizedTitle}.txt`;
+        const parts = proposedPath.split("/").filter(Boolean);
+        if (originalSavedPath && proposedPath === originalSavedPath) return;
+
+        let currentList = directTreeList(treeDropZone);
+        if (!currentList) {
+          currentList = document.createElement("ul");
+          currentList.className = "tree-list";
+          treeDropZone.append(currentList);
+        }
+
+        let currentPath = "";
+        for (const folderName of parts.slice(0, -1)) {
+          currentPath = currentPath ? `${currentPath}/${folderName}` : folderName;
+          const existingFolder = Array.from(document.querySelectorAll(".tree-folder:not(.proposed-folder)"))
+            .find((folder) => folder.dataset.treePath === currentPath);
+          if (existingFolder) {
+            existingFolder.open = true;
+            existingFolder.querySelector(".tree-empty")?.remove();
+            let childList = directTreeList(existingFolder);
+            if (!childList) {
+              childList = document.createElement("ul");
+              childList.className = "tree-list";
+              existingFolder.append(childList);
+            }
+            currentList = childList;
+          } else {
+            const proposedFolder = makeProposedFolder(folderName, currentPath);
+            currentList.append(proposedFolder.item);
+            currentList = proposedFolder.children;
+          }
+        }
+        currentList.append(makeProposedFile(normalizedTitle, proposedPath));
+      }
+
+      function hasUnsavedChanges() {
+        return currentValue() !== initialValue;
+      }
+
+      document.querySelectorAll(".tree-delete").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (hasUnsavedChanges()) {
+            saveState.textContent = "Save changes before deleting items";
+            saveState.classList.add("unsaved");
+            return;
+          }
+
+          const isFolder = button.dataset.deleteKind === "folder";
+          deleteHeading.textContent = `Delete ${isFolder ? "folder" : "note"} “${button.dataset.deleteName}”?`;
+          deleteWarning.textContent = isFolder
+            ? "The folder and everything inside it will be permanently deleted."
+            : "The note will be permanently deleted.";
+          deletePath.value = button.dataset.deletePath;
+          deleteCurrentPath.value = originalSavedPath;
+          deleteDialog.showModal();
+        });
+      });
+
+      function clearDropHighlight() {
+        document.querySelectorAll(".drop-target").forEach((node) => node.classList.remove("drop-target"));
+        treeDropZone.classList.remove("root-drop-target");
+      }
+
+      function folderDropTarget(eventTarget) {
+        const target = eventTarget.closest("[data-folder-drop-path]");
+        return target && treeDropZone.contains(target) ? target : null;
+      }
+
+      let draggedElement = null;
+      treeDropZone.addEventListener("dragstart", (event) => {
+        const item = event.target.closest("[data-drag-path]");
+        if (!item || !treeDropZone.contains(item)) return;
+        if (hasUnsavedChanges()) {
+          event.preventDefault();
+          saveState.textContent = "Save changes before moving items";
+          saveState.classList.add("unsaved");
+          return;
+        }
+        draggedElement = item;
+        item.classList.add("dragging");
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", item.dataset.dragPath);
+      });
+
+      treeDropZone.addEventListener("dragover", (event) => {
+        if (!draggedElement) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        clearDropHighlight();
+        const folder = folderDropTarget(event.target);
+        if (folder) folder.classList.add("drop-target");
+        else treeDropZone.classList.add("root-drop-target");
+      });
+
+      treeDropZone.addEventListener("drop", async (event) => {
+        if (!draggedElement) return;
+        event.preventDefault();
+        const source = draggedElement.dataset.dragPath;
+        const folder = folderDropTarget(event.target);
+        const destination = folder ? folder.dataset.folderDropPath : "";
+        clearDropHighlight();
+
+        const response = await fetch("/move", {
+          method: "POST",
+          headers: { "Accept": "application/json" },
+          body: new URLSearchParams({ source, destination }),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          window.alert(result.error || "The item could not be moved.");
+          draggedElement.classList.remove("dragging");
+          draggedElement = null;
+          return;
+        }
+
+        const currentSuffix = originalSavedPath === source
+          ? ""
+          : originalSavedPath.startsWith(`${source}/`)
+            ? originalSavedPath.slice(source.length)
+            : null;
+        if (currentSuffix !== null) {
+          window.location.assign(`/?path=${encodeURIComponent(result.path + currentSuffix)}`);
+        } else {
+          window.location.reload();
+        }
+      });
+
+      treeDropZone.addEventListener("dragend", () => {
+        clearDropHighlight();
+        draggedElement?.classList.remove("dragging");
+        draggedElement = null;
+      });
+
+      function updateEditor() {
+        const format = selectedFormat();
+        const columns = Math.floor(fontMetrics[format.font].columns / format.width);
+        receipt.dataset.font = format.font;
+        receipt.dataset.width = String(format.width);
+        receipt.dataset.height = String(format.height);
+        content.cols = columns;
+
+        const normalizedTitle = titleInput.value.trim().replace(/\.txt$/i, "").trim();
+        const hasInvalidTitle = !normalizedTitle || normalizedTitle === "." || normalizedTitle === ".." || /[\\/]/.test(normalizedTitle);
+        titleInput.setCustomValidity(hasInvalidTitle ? "Enter a title without slashes." : "");
+
+        const hasInvalidCharacters = /[^\x20-\x7E\r\n]/.test(content.value);
+        asciiWarning.hidden = !hasInvalidCharacters;
+        content.setCustomValidity(hasInvalidCharacters ? "Use printable ASCII characters only." : "");
+
+        const changed = hasUnsavedChanges();
+        saveState.textContent = changed ? "Unsaved changes" : "Ready";
+        saveState.classList.toggle("unsaved", changed);
+      }
+
+      content.addEventListener("input", updateEditor);
+      content.addEventListener("click", updateEditor);
+      content.addEventListener("keyup", updateEditor);
+      titleInput.addEventListener("input", () => {
+        updateProposedLocation();
+        updateEditor();
+      });
+      [...fontInputs, ...sizeInputs].forEach((input) => input.addEventListener("change", updateEditor));
+      form.addEventListener("submit", () => { saveState.textContent = "Working…"; });
+      document.addEventListener("keydown", (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+          event.preventDefault();
+          form.requestSubmit(saveButton);
+        }
+      });
+      updateProposedLocation();
+      updateEditor();
+      updatePrinterStatus();
+      window.setInterval(updatePrinterStatus, 15000);
+    </script>
+  </body>
+</html>
