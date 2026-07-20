@@ -1,0 +1,20 @@
+[Unit]
+Description=Receipt Notes
+Documentation=https://github.com/grsouth/receipt-notes
+
+[Service]
+Type=simple
+WorkingDirectory=/home/grs/Projects/receipt-notes
+EnvironmentFile=%h/.config/receipt-notes/environment
+Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/usr/bin/tailscale wait --timeout=60s
+ExecStart=/home/grs/Projects/receipt-notes/.venv/bin/python /home/grs/Projects/receipt-notes/serve.py
+Restart=on-failure
+RestartSec=3s
+TimeoutStopSec=15s
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

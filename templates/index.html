@@ -243,6 +243,7 @@
             <span class="toolbar-separator" aria-hidden="true"></span>
             <button type="button" data-tool="inline" data-command="underline" aria-pressed="false" title="Underline"><u>U</u></button>
             <button type="button" data-tool="inline" data-command="invert" aria-pressed="false" title="Reverse text (white on black)">Reverse</button>
+            <button type="button" data-tool="bullet" aria-pressed="false" title="Toggle bulleted list">&bull; Bullet</button>
             <button type="button" data-tool="rule" title="Add horizontal line">Add Line</button>
             <span class="toolbar-separator" aria-hidden="true"></span>
             <button type="button" data-tool="alignment" data-align="left" aria-pressed="false" title="Align left">Left</button>
@@ -289,6 +290,7 @@
           <div class="form-actions">
             <div class="beautify-actions">
               <button class="button beautify-action" id="beautify-button" type="button" title="Format this receipt with local AI">Beautify</button>
+              <button class="button secondary" id="clear-button" type="button" title="Clear the receipt body">Clear</button>
               <button
                 class="button secondary undo-beautify"
                 id="undo-beautify"
@@ -325,6 +327,7 @@
       const saveButton = document.querySelector("#save-button");
       const saveState = document.querySelector("#save-state");
       const beautifyButton = document.querySelector("#beautify-button");
+      const clearButton = document.querySelector("#clear-button");
       const undoBeautify = document.querySelector("#undo-beautify");
       const beautifyOverlay = document.querySelector("#beautify-overlay");
       const printerStatus = document.querySelector("#printer-status");
@@ -507,6 +510,19 @@
         beautifyOverlay.setAttribute("aria-hidden", String(!waiting));
         receiptEditor.inert = waiting;
         receiptEditor.setAttribute("aria-busy", String(waiting));
+        clearButton.disabled = waiting;
+      }
+
+      function clearReceipt() {
+        clearBeautifyUndo();
+        clearSelectedRule();
+        savedEditorRange = null;
+        renderEditorDocument({ blocks: [] });
+        syncSource();
+        updateEditor();
+        updateToolbarState();
+        queueAutosave();
+        receiptEditor.focus();
       }
 
       async function beautifyReceipt() {
@@ -600,6 +616,7 @@
       }
 
       beautifyButton.addEventListener("click", beautifyReceipt);
+      clearButton.addEventListener("click", clearReceipt);
       undoBeautify.addEventListener("click", undoLastBeautify);
 
       async function updatePrinterStatus({ manual = false } = {}) {
@@ -1254,6 +1271,7 @@
         if (node.nodeType === Node.TEXT_NODE) return node.nodeValue.replaceAll("\u00a0", " ");
         if (node.nodeType !== Node.ELEMENT_NODE) return "";
         if (node.tagName === "BR") return "";
+        if (node.classList.contains("bullet-marker")) return node.dataset.source || "* ";
 
         let result = Array.from(node.childNodes).map(serializeInline).join("");
         if (node.tagName === "U") result = `++${result}++`;
@@ -1507,6 +1525,14 @@
             return;
           }
           if (node.nodeType !== Node.ELEMENT_NODE || node.tagName === "BR") return;
+          if (node.classList.contains("bullet-marker")) {
+            appendInlineSegment(segments, {
+              text: node.dataset.source || "* ",
+              underline: false,
+              invert: false,
+            });
+            return;
+          }
           const nextStyle = {
             underline: style.underline || node.tagName === "U",
             invert: style.invert || node.classList.contains("receipt-reverse"),
@@ -1532,6 +1558,16 @@
           marker.textContent = text.slice(0, checklist.markerEnd);
           block.append(marker);
           sliceInlineSegments(segments, checklist.markerEnd, text.length)
+            .forEach((segment) => block.append(makeInlineRun(segment)));
+        } else if (bulletParts(text)) {
+          const bullet = bulletParts(text);
+          const marker = document.createElement("span");
+          marker.className = "bullet-marker";
+          marker.contentEditable = "false";
+          marker.dataset.source = text.slice(0, bullet.markerEnd);
+          marker.textContent = `${bullet.indent}\u2022`;
+          block.append(marker);
+          sliceInlineSegments(segments, bullet.markerEnd, text.length)
             .forEach((segment) => block.append(makeInlineRun(segment)));
         } else {
           segments.forEach((segment) => block.append(makeInlineRun(segment)));
@@ -1597,6 +1633,77 @@
         };
       }
 
+      function bulletParts(text) {
+        const match = text.replaceAll("\u00a0", " ").match(/^([ ]*)\*([ ]+)(.*)$/);
+        if (!match) return null;
+        return {
+          indent: match[1],
+          markerEnd: match[1].length + 1,
+          prefixLength: match[1].length + 1 + match[2].length,
+          body: match[3],
+        };
+      }
+
+      function dashListParts(text) {
+        const match = text.replaceAll("\u00a0", " ").match(/^([ ]*)-([ ]+)(.*)$/);
+        if (!match) return null;
+        return {
+          indent: match[1],
+          prefixLength: match[1].length + 1 + match[2].length,
+          body: match[3],
+        };
+      }
+
+      function toggleBulletList() {
+        const details = selectionDetails();
+        const entries = details?.entries.filter(({ block }) => block.dataset.kind !== "rule") || [];
+        if (!entries.length) return;
+
+        const removeBullets = entries.every(({ block }) => {
+          const text = inlineSegments(block).map((segment) => segment.text).join("");
+          return Boolean(bulletParts(text));
+        });
+        const collapsed = details.range.collapsed && entries.length === 1;
+        let collapsedOffset = entries[0].start;
+
+        entries.forEach(({ block, start }) => {
+          const segments = inlineSegments(block);
+          const text = segments.map((segment) => segment.text).join("").replaceAll("\u00a0", " ");
+          const bullet = bulletParts(text);
+
+          if (removeBullets && bullet) {
+            const markerLength = bullet.prefixLength - bullet.indent.length;
+            renderInlineSegments(block, [
+              { text: bullet.indent, underline: false, invert: false },
+              ...sliceInlineSegments(segments, bullet.prefixLength, text.length),
+            ]);
+            if (collapsed) collapsedOffset = Math.max(bullet.indent.length, start - markerLength);
+            return;
+          }
+
+          if (bullet) return;
+
+          const checklist = checklistParts(text);
+          const dash = checklist ? null : dashListParts(text);
+          const indent = checklist?.indent ?? dash?.indent ?? text.match(/^ */)[0];
+          const bodyStart = checklist?.prefixLength ?? dash?.prefixLength ?? indent.length;
+          const prefix = `${indent}* `;
+          renderInlineSegments(block, [
+            { text: prefix, underline: false, invert: false },
+            ...sliceInlineSegments(segments, bodyStart, text.length),
+          ]);
+          if (collapsed) collapsedOffset = prefix.length + Math.max(0, start - bodyStart);
+        });
+
+        if (collapsed) {
+          selectTextOffsets(entries[0].block, collapsedOffset, entries[0].block, collapsedOffset);
+        } else {
+          const first = entries[0].block;
+          const last = entries[entries.length - 1].block;
+          selectTextOffsets(first, 0, last, nodeTextLength(last));
+        }
+      }
+
       function setChecklistChecked(block, checked, caretOffset) {
         const segments = inlineSegments(block);
         const text = segments.map((segment) => segment.text).join("");
@@ -1626,15 +1733,19 @@
         return setChecklistChecked(block, !checklist.checked, start);
       }
 
-      function decorateChecklistAtCaret() {
+      function decorateListMarkerAtCaret() {
         const details = selectionDetails();
         if (!details?.range.collapsed || details.entries.length !== 1) return;
         const { block, start } = details.entries[0];
-        if (block.querySelector(".checklist-marker")) return;
+        if (block.querySelector(".checklist-marker, .bullet-marker")) return;
         const segments = inlineSegments(block);
         const text = segments.map((segment) => segment.text).join("");
         const checklist = checklistParts(text);
-        if (!checklist || checklist.prefixLength <= checklist.markerEnd) return;
+        const bullet = bulletParts(text);
+        if (
+          (!checklist || checklist.prefixLength <= checklist.markerEnd)
+          && !bullet
+        ) return;
         renderInlineSegments(block, segments);
         selectTextOffsets(block, start, block, start);
       }
@@ -1759,6 +1870,12 @@
             pressed = blocks.every((block) => blockSize(block) === button.dataset.size);
           } else if (blocks.length && button.dataset.tool === "alignment") {
             pressed = blocks.every((block) => block.dataset.align === button.dataset.align);
+          } else if (blocks.length && button.dataset.tool === "bullet") {
+            const paragraphs = blocks.filter((block) => block.dataset.kind !== "rule");
+            pressed = Boolean(paragraphs.length) && paragraphs.every((block) => {
+              const text = inlineSegments(block).map((segment) => segment.text).join("");
+              return Boolean(bulletParts(text));
+            });
           } else if (blocks.length && button.dataset.tool === "inline") {
             const command = button.dataset.command;
             pressed = details.range.collapsed
@@ -1779,9 +1896,10 @@
         const segments = inlineSegments(block);
         const text = segments.map((segment) => segment.text).join("").replaceAll("\u00a0", " ");
         const checklist = checklistParts(text);
-        const match = checklist ? null : text.match(/^([ ]*-[ ]+)(.*)$/);
-        const prefixLength = checklist?.prefixLength || match?.[1].length;
-        const body = checklist?.body ?? match?.[2];
+        const bullet = checklist ? null : bulletParts(text);
+        const match = checklist || bullet ? null : text.match(/^([ ]*-[ ]+)(.*)$/);
+        const prefixLength = checklist?.prefixLength || bullet?.prefixLength || match?.[1].length;
+        const body = checklist?.body ?? bullet?.body ?? match?.[2];
         if (!prefixLength || start < prefixLength) return false;
 
         event.preventDefault();
@@ -1791,7 +1909,9 @@
         } else {
           const prefix = checklist
             ? `${checklist.indent}- [ ] `
-            : `${match[1].match(/^ */)[0]}- `;
+            : bullet
+              ? `${bullet.indent}* `
+              : `${match[1].match(/^ */)[0]}- `;
           const before = sliceInlineSegments(segments, 0, start);
           const after = sliceInlineSegments(segments, start, text.length);
           renderInlineSegments(block, before);
@@ -1828,6 +1948,8 @@
             setBlockSize(button.dataset.size);
           } else if (button.dataset.tool === "alignment") {
             setBlockAlignment(button.dataset.align);
+          } else if (button.dataset.tool === "bullet") {
+            toggleBulletList();
           } else if (button.dataset.tool === "rule") {
             insertRule();
           }
@@ -1855,7 +1977,7 @@
 
       receiptEditor.addEventListener("input", () => {
         if (!applyingBeautify) clearBeautifyUndo();
-        decorateChecklistAtCaret();
+        decorateListMarkerAtCaret();
         syncSource();
         updateEditor();
         updateToolbarState();

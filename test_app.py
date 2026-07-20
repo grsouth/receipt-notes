@@ -6,12 +6,51 @@ from zoneinfo import ZoneInfo
 import pytest
 
 import app as receipt_app
+import serve as receipt_server
 from receipt_markdown import editor_document, layout_document, normalize_source
 
 
 def configure_vault(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(receipt_app, "VAULT_ROOT", tmp_path.resolve())
     receipt_app.app.config.update(TESTING=True)
+
+
+def test_server_bind_configuration(monkeypatch):
+    monkeypatch.delenv("APP_HOST", raising=False)
+    monkeypatch.delenv("APP_PORT", raising=False)
+    assert receipt_app.server_host() == "100.71.126.126"
+    assert receipt_app.server_port() == 8000
+
+    monkeypatch.setenv("APP_HOST", "127.0.0.1")
+    monkeypatch.setenv("APP_PORT", "9000")
+    assert receipt_app.server_host() == "127.0.0.1"
+    assert receipt_app.server_port() == 9000
+
+    for invalid in ("nope", "0", "65536"):
+        monkeypatch.setenv("APP_PORT", invalid)
+        with pytest.raises(ValueError, match="APP_PORT"):
+            receipt_app.server_port()
+
+
+def test_production_entrypoint_starts_scheduler_and_waitress(monkeypatch):
+    calls = []
+    monkeypatch.setattr(receipt_server, "start_scheduler", lambda: calls.append("scheduler"))
+    monkeypatch.setattr(receipt_server, "server_host", lambda: "127.0.0.1")
+    monkeypatch.setattr(receipt_server, "server_port", lambda: 9000)
+    monkeypatch.setattr(
+        receipt_server,
+        "serve",
+        lambda application, **settings: calls.append(
+            (application, settings)
+        ),
+    )
+
+    receipt_server.main()
+
+    assert calls == [
+        "scheduler",
+        (receipt_app.app, {"host": "127.0.0.1", "port": 9000, "threads": 4}),
+    ]
 
 
 def test_receipt_markdown_mixed_styles_and_wrapping():
@@ -38,11 +77,31 @@ def test_receipt_markdown_mixed_styles_and_wrapping():
     wrapped = layout_document("x" * 43)
     assert ["".join(run.text for run in line.runs) for line in wrapped] == ["x" * 42, "x"]
 
+    sentence = "This is a poem about fish, and I'm very proud of it."
+    word_wrapped = layout_document(sentence)
+    assert ["".join(run.text for run in line.runs) for line in word_wrapped] == [
+        "This is a poem about fish, and I'm very",
+        "proud of it.",
+    ]
+
+    mixed_wrap = layout_document(f"{'x' * 38} ++proud++")
+    assert "".join(run.text for run in mixed_wrap[0].runs) == "x" * 38
+    assert [(run.text, run.style.underline) for run in mixed_wrap[1].runs] == [
+        ("proud", 1)
+    ]
+
     checklist = layout_document("- [ ] open\n- [x] done")
     assert ["".join(run.text for run in line.runs) for line in checklist] == [
         "- [ ] open",
         "- [x] done",
     ]
+
+    bullets = layout_document("* first\n  * second")
+    assert ["".join(run.text for run in line.runs) for line in bullets] == [
+        "\u2022 first",
+        "  \u2022 second",
+    ]
+    assert editor_document("* first")["blocks"][0]["runs"][0]["text"] == "* first"
 
 
 def test_receipt_markdown_directives_and_validation():
@@ -315,7 +374,7 @@ def test_request_ollama_uses_local_structured_chat(monkeypatch):
     assert content == '{"blocks": []}'
     assert captured["url"] == "http://127.0.0.1:11434/api/chat"
     assert captured["timeout"] == 90
-    assert captured["payload"]["model"] == "gemma4:latest"
+    assert captured["payload"]["model"] == "gemma4:12b"
     assert captured["payload"]["format"] == receipt_app.BEAUTIFY_SCHEMA
     assert captured["payload"]["stream"] is False
     assert captured["payload"]["think"] is False
@@ -381,6 +440,8 @@ def test_note_tree_includes_nested_and_empty_directories(monkeypatch, tmp_path):
     assert b'aria-controls="file-sidebar"' in response.data
     assert b'id="receipt-scale-frame"' in response.data
     assert b'id="beautify-button"' in response.data
+    assert b'id="clear-button"' in response.data
+    assert b'data-tool="bullet"' in response.data
     assert b'id="undo-beautify"' in response.data
     assert b'id="beautify-overlay"' in response.data
     assert response.data.index(b'id="receipt-editor"') < response.data.index(b'id="beautify-button"')
@@ -458,6 +519,7 @@ def test_today_and_tomorrow_create_and_reopen_dated_notes(monkeypatch, tmp_path)
 def test_printer_connection_status(monkeypatch, tmp_path):
     configure_vault(monkeypatch, tmp_path)
     client = receipt_app.app.test_client()
+    monkeypatch.setenv("PRINTER_TYPE", "network")
 
     monkeypatch.delenv("PRINTER_HOST", raising=False)
     response = client.get("/printer-status")
@@ -478,6 +540,32 @@ def test_printer_connection_status(monkeypatch, tmp_path):
     response = client.get("/printer-status")
     assert response.get_json() == {"connected": True, "label": "Printer connected"}
     assert calls == [("connect", ("192.0.2.10", 9100), 0.4), ("close",)]
+
+
+def test_usb_printer_connection_status(monkeypatch, tmp_path):
+    configure_vault(monkeypatch, tmp_path)
+    client = receipt_app.app.test_client()
+    searches = []
+
+    class FakeUsbCore:
+        class USBError(Exception):
+            pass
+
+        @staticmethod
+        def find(**values):
+            searches.append(values)
+            return type("Device", (), {"bus": 1, "address": 7})()
+
+    monkeypatch.setenv("PRINTER_TYPE", "usb")
+    monkeypatch.setenv("PRINTER_USB_VENDOR_ID", "0x04b8")
+    monkeypatch.setenv("PRINTER_USB_PRODUCT_ID", "0202")
+    monkeypatch.setattr(receipt_app, "usb_core", FakeUsbCore)
+    monkeypatch.setattr(receipt_app.os, "access", lambda _path, _mode: True)
+
+    response = client.get("/printer-status")
+
+    assert response.get_json() == {"connected": True, "label": "Printer connected"}
+    assert searches == [{"idVendor": 0x04B8, "idProduct": 0x0202}]
 
 
 def test_changing_title_renames_markdown_note(monkeypatch, tmp_path):
@@ -766,6 +854,7 @@ def test_move_and_delete_markdown_notes(monkeypatch, tmp_path):
 
 def test_print_uses_mixed_native_escpos_styles_and_closes(monkeypatch, tmp_path):
     configure_vault(monkeypatch, tmp_path)
+    monkeypatch.setenv("PRINTER_TYPE", "network")
     monkeypatch.setenv("PRINTER_HOST", "192.0.2.10")
     calls = []
 
@@ -824,3 +913,35 @@ def test_print_uses_mixed_native_escpos_styles_and_closes(monkeypatch, tmp_path)
     assert ("cut", False) in calls
     assert calls[-1] == ("close",)
     assert receipt_app.schedule_path(note).exists()
+
+
+def test_send_to_usb_printer_uses_configured_ids_and_closes(monkeypatch):
+    calls = []
+
+    class FakeUsb:
+        def __init__(self, vendor_id, product_id, profile):
+            calls.append(("connect", vendor_id, product_id, profile))
+
+        def set(self, **settings):
+            calls.append(("set", settings))
+
+        def text(self, value):
+            calls.append(("text", value))
+
+        def cut(self, feed=True):
+            calls.append(("cut", feed))
+
+        def close(self):
+            calls.append(("close",))
+
+    monkeypatch.setenv("PRINTER_TYPE", "usb")
+    monkeypatch.setenv("PRINTER_USB_VENDOR_ID", "04b8")
+    monkeypatch.setenv("PRINTER_USB_PRODUCT_ID", "0x0202")
+    monkeypatch.setattr(receipt_app, "Usb", FakeUsb)
+
+    receipt_app.send_to_printer("USB test")
+
+    assert calls[0] == ("connect", 0x04B8, 0x0202, "default")
+    assert ("text", "USB test") in calls
+    assert ("cut", False) in calls
+    assert calls[-1] == ("close",)

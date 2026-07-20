@@ -164,7 +164,10 @@ def parse_document(source: str) -> list[LogicalLine]:
         if raw_line.strip() == "---":
             parsed.append(LogicalLine((Run("-" * 42, TextStyle()),), "left"))
         else:
-            parsed.append(LogicalLine(parse_inline(raw_line, style), align))
+            indent = raw_line[: len(raw_line) - len(raw_line.lstrip(" "))]
+            body = raw_line[len(indent) :]
+            printable_line = f"{indent}\u2022{body[1:]}" if body.startswith("* ") else raw_line
+            parsed.append(LogicalLine(parse_inline(printable_line, style), align))
 
     return parsed
 
@@ -195,7 +198,7 @@ def editor_document(source: str) -> dict:
 
 
 def layout_document(source: str, width: int = PRINT_WIDTH) -> list[LogicalLine]:
-    """Wrap mixed-style runs against the printer's dot width."""
+    """Wrap mixed-style runs at words, with hard splits for oversized words."""
     laid_out: list[LogicalLine] = []
     for logical in parse_document(source):
         if not logical.runs:
@@ -208,13 +211,42 @@ def layout_document(source: str, width: int = PRINT_WIDTH) -> list[LogicalLine]:
             metrics = FONT_METRICS[run.style.font]
             character_width = metrics["cell_width"] * run.style.width
             for character in run.text:
-                if used and used + character_width > width:
-                    laid_out.append(LogicalLine(_coalesce(current), logical.align))
-                    current = []
-                    used = 0
+                wrapped = False
+                while current and used + character_width > width:
+                    break_at = None
+                    seen_text = False
+                    for index, unit in enumerate(current):
+                        if unit.text == " " and seen_text:
+                            break_at = index
+                        elif unit.text != " ":
+                            seen_text = True
+
+                    if break_at is None:
+                        laid_out.append(LogicalLine(_coalesce(current), logical.align))
+                        current = []
+                        used = 0
+                    else:
+                        line = current[:break_at]
+                        remainder = current[break_at + 1 :]
+                        while line and line[-1].text == " ":
+                            line.pop()
+                        while remainder and remainder[0].text == " ":
+                            remainder.pop(0)
+                        laid_out.append(LogicalLine(_coalesce(line), logical.align))
+                        current = remainder
+                        used = sum(
+                            FONT_METRICS[unit.style.font]["cell_width"]
+                            * unit.style.width
+                            for unit in current
+                        )
+                    wrapped = True
+
+                if wrapped and not current and character == " ":
+                    continue
                 current.append(Run(character, run.style))
                 used += character_width
-        laid_out.append(LogicalLine(_coalesce(current), logical.align))
+        if current:
+            laid_out.append(LogicalLine(_coalesce(current), logical.align))
     return laid_out
 
 
