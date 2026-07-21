@@ -3,319 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#14110f">
+    <meta name="theme-color" content="#101418">
     <title>Receipt Notes</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
     <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
-    <style media="not all">
-      :root {
-        color-scheme: light;
-        --ink: #17324d;
-        --muted: #677586;
-        --paper: #fffdf5;
-        --canvas: #e9e4d9;
-        --sidebar: #f4f0e7;
-        --line: #d7d0c1;
-        --accent: #e65b42;
-        --accent-dark: #bd402d;
-        --success: #1f7250;
-        --danger: #a63e35;
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      }
-
-      * { box-sizing: border-box; }
-      body { margin: 0; min-width: 320px; background: var(--canvas); color: var(--ink); }
-      button, input, textarea { font: inherit; }
-      a { color: inherit; }
-
-      .app-shell {
-        display: grid;
-        grid-template-columns: 18.5rem minmax(0, 1fr);
-        min-height: 100vh;
-      }
-
-      .sidebar {
-        display: flex;
-        flex-direction: column;
-        min-height: 100vh;
-        max-height: 100vh;
-        padding: .75rem .65rem;
-        overflow-y: auto;
-        background: var(--sidebar);
-        border-right: 1px solid var(--line);
-      }
-
-      .sidebar-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: .4rem;
-        margin-bottom: .65rem;
-        padding: 0 .1rem .7rem;
-        border-bottom: 1px solid var(--line);
-      }
-      .sidebar-action {
-        display: grid;
-        place-items: center;
-        min-height: 2.2rem;
-        padding: .45rem .55rem;
-        border: 1px solid #c9c1b3;
-        border-radius: .45rem;
-        background: #fff9;
-        color: var(--ink);
-        cursor: pointer;
-        font-size: .76rem;
-        font-weight: 700;
-        text-decoration: none;
-        white-space: nowrap;
-        transition: border-color .12s, background .12s;
-      }
-      .sidebar-action:hover { border-color: var(--accent); background: #fff; }
-
-      .folder-icon {
-        position: relative;
-        flex: 0 0 auto;
-        width: .92rem;
-        height: .66rem;
-        border-radius: .12rem;
-        background: #d5a843;
-      }
-      .folder-icon::before {
-        position: absolute;
-        top: -.22rem;
-        left: .08rem;
-        width: .42rem;
-        height: .25rem;
-        border-radius: .12rem .12rem 0 0;
-        background: #d5a843;
-        content: "";
-      }
-      .tree-list { display: grid; gap: .08rem; margin: 0; padding: 0; list-style: none; }
-      .tree-list .tree-list {
-        margin-left: .72rem;
-        padding-left: .52rem;
-        border-left: 1px solid #d6cfc1;
-      }
-      .tree-drop-zone { flex: 1; min-height: 6rem; border-radius: .5rem; transition: background .12s, box-shadow .12s; }
-      .tree-drop-zone.root-drop-target { background: #e65b420d; box-shadow: inset 0 0 0 1px #e65b4266; }
-      .tree-item { min-width: 0; }
-      .tree-folder > summary {
-        display: flex;
-        align-items: center;
-        gap: .42rem;
-        min-height: 2rem;
-        padding: .35rem .45rem;
-        border-radius: .45rem;
-        color: #45566a;
-        cursor: pointer;
-        font: 600 .8rem/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
-        list-style: none;
-        user-select: none;
-      }
-      .tree-folder > summary::-webkit-details-marker { display: none; }
-      .tree-folder > summary:hover { background: #fff9; color: var(--ink); }
-      .tree-folder > summary[draggable="true"], .tree-file[draggable="true"] { cursor: grab; }
-      .tree-folder > summary[draggable="true"]:active, .tree-file[draggable="true"]:active { cursor: grabbing; }
-      .tree-folder > summary.drop-target { background: #f9ded6; color: var(--accent-dark); box-shadow: inset 0 0 0 1px #e65b4266; }
-      .tree-folder.proposed-folder > summary { opacity: .58; font-style: italic; }
-      .tree-chevron {
-        flex: 0 0 auto;
-        width: .35rem;
-        color: #89929d;
-        font-size: .7rem;
-        transition: transform .12s;
-      }
-      .tree-folder[open] > summary .tree-chevron { transform: rotate(90deg); }
-      .tree-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .file-icon {
-        position: relative;
-        flex: 0 0 auto;
-        width: .72rem;
-        height: .9rem;
-        border: 1px solid #89929d;
-        border-radius: .08rem;
-        opacity: .8;
-      }
-      .file-icon::after {
-        position: absolute;
-        right: .1rem;
-        bottom: .18rem;
-        left: .1rem;
-        height: 1px;
-        background: #89929d;
-        box-shadow: 0 -.2rem 0 #89929d;
-        content: "";
-      }
-      .tree-file {
-        display: flex;
-        align-items: center;
-        gap: .48rem;
-        overflow: hidden;
-        min-height: 2rem;
-        padding: .35rem .45rem .35rem 1.2rem;
-        border-radius: .45rem;
-        color: #45566a;
-        font: .79rem/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
-        text-decoration: none;
-      }
-      .tree-file:hover { background: #fff9; color: var(--ink); }
-      .tree-file.active { background: var(--ink); color: white; box-shadow: 0 .2rem .65rem #17324d20; }
-      .tree-file.active .file-icon { border-color: white; }
-      .tree-file.active .file-icon::after { background: white; box-shadow: 0 -.2rem 0 white; }
-      .tree-file.proposed { border: 1px dashed #b9b2a4; opacity: .62; font-style: italic; cursor: default; }
-      .tree-file.dragging, .tree-folder > summary.dragging { opacity: .35; }
-      .tree-empty { margin: .2rem 0 .35rem 1.2rem; color: #9a9489; font: italic .7rem/1.3 ui-monospace, monospace; }
-
-      dialog {
-        width: min(28rem, calc(100vw - 2rem));
-        padding: 0;
-        border: 1px solid #bfb7a8;
-        border-radius: .8rem;
-        background: #fffaf1;
-        color: var(--ink);
-        box-shadow: 0 1.2rem 3rem #17324d35;
-      }
-      dialog::backdrop { background: #17324d55; backdrop-filter: blur(2px); }
-      .directory-form { display: grid; gap: 1rem; padding: 1.2rem; }
-      .directory-form h3 { margin: 0; font: 700 1.2rem/1.1 Georgia, serif; }
-      .directory-form label { display: grid; gap: .4rem; font-size: .76rem; font-weight: 800; text-transform: uppercase; }
-      .directory-form input { width: 100%; padding: .7rem .8rem; border: 1px solid #bfb7a8; border-radius: .5rem; background: white; color: var(--ink); font: .86rem ui-monospace, monospace; }
-      .dialog-actions { display: flex; justify-content: flex-end; gap: .5rem; }
-
-      .workspace { min-width: 0; padding: 2rem clamp(1rem, 4vw, 4rem) 3rem; }
-      .workspace-header {
-        display: flex;
-        align-items: flex-end;
-        justify-content: space-between;
-        gap: 2rem;
-        max-width: 64rem;
-        margin: 0 auto 1.5rem;
-      }
-      .eyebrow { margin: 0 0 .35rem; color: var(--accent-dark); font-size: .72rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
-      .workspace h2 { margin: 0; font: 700 clamp(1.55rem, 3vw, 2.25rem)/1.1 Georgia, serif; }
-      .save-state { color: var(--muted); font-size: .8rem; white-space: nowrap; }
-      .save-state.unsaved { color: var(--accent-dark); font-weight: 700; }
-
-      .notice {
-        max-width: 64rem;
-        margin: 0 auto 1rem;
-        padding: .75rem 1rem;
-        border-radius: .65rem;
-        font-size: .86rem;
-      }
-      .notice.success { background: #dcefe5; color: var(--success); }
-      .notice.error { background: #f8ded8; color: var(--danger); }
-
-      .note-form { max-width: 64rem; margin: 0 auto; }
-      .path-row { display: grid; gap: .42rem; margin-bottom: 1.25rem; }
-      .path-row label { font-size: .76rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
-      .path-input-wrap { position: relative; max-width: 38rem; }
-      .path-prefix { position: absolute; top: 50%; left: .8rem; transform: translateY(-50%); color: var(--muted); font: .8rem ui-monospace, monospace; pointer-events: none; }
-      .path-row input {
-        width: 100%;
-        padding: .72rem .9rem .72rem 2.15rem;
-        border: 1px solid #bfb7a8;
-        border-radius: .62rem;
-        outline: none;
-        background: #fffaf1;
-        color: var(--ink);
-        font: .88rem ui-monospace, SFMono-Regular, Consolas, monospace;
-        box-shadow: 0 1px 0 #fff inset;
-      }
-      .path-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 .2rem #e65b4220; }
-
-      .editor-stage {
-        display: flex;
-        align-items: flex-start;
-        justify-content: center;
-        padding: clamp(1rem, 4vw, 2.25rem);
-        border: 1px solid #cbc3b4;
-        border-radius: 1rem;
-        background-color: #ded8cc;
-        background-image: radial-gradient(#9f988b44 .7px, transparent .7px);
-        background-size: 5px 5px;
-        box-shadow: 0 .7rem 2rem #4c453b14 inset;
-      }
-
-      .receipt {
-        position: relative;
-        width: min(100%, 39rem);
-        padding: 1.5rem clamp(1rem, 4vw, 2rem) 1.25rem;
-        background: var(--paper);
-        box-shadow: 0 .8rem 2rem #544c3f2c, 0 1px 0 #fff inset;
-      }
-      .receipt::before, .receipt::after {
-        position: absolute;
-        right: 0;
-        left: 0;
-        height: .45rem;
-        content: "";
-        background: linear-gradient(135deg, transparent 50%, var(--paper) 50%) 0 0 / .75rem .75rem repeat-x;
-      }
-      .receipt::before { top: -.44rem; transform: rotate(180deg); }
-      .receipt::after { bottom: -.44rem; }
-
-      .receipt-header, .receipt-footer { display: flex; justify-content: space-between; gap: 1rem; color: #746f65; font: 700 .68rem/1 ui-monospace, monospace; letter-spacing: .08em; }
-      .receipt-header { padding-bottom: 1rem; border-bottom: 1px dashed #b9b2a4; }
-      .ruler { overflow: hidden; margin: .85rem 0 .35rem; color: #aaa397; font: .68rem/1 ui-monospace, monospace; white-space: nowrap; user-select: none; }
-      .receipt textarea {
-        display: block;
-        box-sizing: content-box;
-        width: 48ch;
-        max-width: 100%;
-        min-height: 24rem;
-        margin: 0 auto;
-        padding: .65rem 0;
-        resize: vertical;
-        overflow-x: hidden;
-        border: 0;
-        outline: 0;
-        background: transparent;
-        color: #252a2f;
-        caret-color: var(--accent);
-        font: 1rem/1.42 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-        white-space: pre-wrap;
-      }
-      .receipt textarea::placeholder { color: #aaa397; }
-      .receipt-footer { padding-top: .8rem; border-top: 1px dashed #b9b2a4; }
-      .ascii-warning { color: var(--danger); }
-
-      .form-actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.25rem; }
-      .shortcut { color: var(--muted); font-size: .76rem; }
-      kbd { padding: .12rem .35rem; border: 1px solid #bfb7a8; border-bottom-width: 2px; border-radius: .3rem; background: #f8f4eb; font: .7rem ui-monospace, monospace; }
-      .button-group { display: flex; gap: .65rem; }
-      .button {
-        padding: .72rem 1rem;
-        border: 1px solid transparent;
-        border-radius: .65rem;
-        cursor: pointer;
-        font-size: .86rem;
-        font-weight: 800;
-        transition: transform .12s, box-shadow .12s, background .12s;
-      }
-      .button:hover { transform: translateY(-1px); }
-      .button:active { transform: translateY(0); }
-      .button.secondary { border-color: #bfb7a8; background: #fffaf1; color: var(--ink); }
-      .button.primary { background: var(--accent); color: white; box-shadow: 0 .3rem .8rem #bd402d2c; }
-      .button.primary:hover { background: var(--accent-dark); }
-
-      @media (max-width: 760px) {
-        .app-shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-        .sidebar { align-self: start; min-height: 0; max-height: 16rem; padding-bottom: .65rem; border-right: 0; border-bottom: 1px solid var(--line); }
-        .workspace { padding: 1.35rem .8rem 2.5rem; }
-        .workspace-header { align-items: flex-start; }
-        .editor-stage { padding: 1rem .5rem; }
-        .receipt { padding-right: .75rem; padding-left: .75rem; }
-        .receipt textarea { box-sizing: border-box; width: 100%; }
-        .form-actions { align-items: flex-end; }
-      }
-
-      @media (max-width: 470px) {
-        .workspace-header { display: block; }
-        .save-state { display: block; margin-top: .6rem; }
-        .form-actions { align-items: stretch; flex-direction: column; }
-        .button-group { display: grid; grid-template-columns: 1fr 1fr; }
-        .shortcut { order: 2; text-align: center; }
-      }
-    </style>
   </head>
   <body>
     {% macro render_tree(items) -%}
@@ -334,11 +25,23 @@
                 </summary>
                 {% if item.children %}
                   {{ render_tree(item.children) }}
-                {% else %}
-                  <div class="tree-empty">empty folder</div>
                 {% endif %}
               </details>
               {% if not item.proposed %}
+                <button
+                  class="tree-drag-handle"
+                  type="button"
+                  aria-label="Move folder {{ item.name }}"
+                  title="Hold and drag to move"
+                  data-touch-drag-path="{{ item.path }}"
+                  data-touch-drag-name="{{ item.name }}"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 16 16">
+                    <circle cx="5" cy="4" r="1"></circle><circle cx="11" cy="4" r="1"></circle>
+                    <circle cx="5" cy="8" r="1"></circle><circle cx="11" cy="8" r="1"></circle>
+                    <circle cx="5" cy="12" r="1"></circle><circle cx="11" cy="12" r="1"></circle>
+                  </svg>
+                </button>
                 <button
                   class="tree-delete"
                   type="button"
@@ -369,6 +72,20 @@
               {% endif %}
               {% if not item.proposed %}
                 <button
+                  class="tree-drag-handle"
+                  type="button"
+                  aria-label="Move note {{ item.name }}"
+                  title="Hold and drag to move"
+                  data-touch-drag-path="{{ item.path }}"
+                  data-touch-drag-name="{{ item.name }}"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 16 16">
+                    <circle cx="5" cy="4" r="1"></circle><circle cx="11" cy="4" r="1"></circle>
+                    <circle cx="5" cy="8" r="1"></circle><circle cx="11" cy="8" r="1"></circle>
+                    <circle cx="5" cy="12" r="1"></circle><circle cx="11" cy="12" r="1"></circle>
+                  </svg>
+                </button>
+                <button
                   class="tree-delete"
                   type="button"
                   aria-label="Delete note {{ item.name }}"
@@ -385,7 +102,23 @@
     {%- endmacro %}
 
     <div class="app-shell">
-      <aside class="sidebar">
+      <header class="mobile-header">
+        <button
+          class="mobile-files-button"
+          id="mobile-files-button"
+          type="button"
+          aria-controls="file-sidebar"
+          aria-expanded="false"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M4 7h6l2 2h8v10H4Z"></path>
+          </svg>
+          Files
+        </button>
+        <span class="mobile-note-title">{{ note_title }}</span>
+      </header>
+
+      <aside class="sidebar" id="file-sidebar" aria-label="Files">
         <div class="sidebar-actions">
           <a class="sidebar-action" href="/" aria-label="New note" title="New note">
             <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -399,11 +132,21 @@
               <path d="M12 14h6M15 11v6"></path>
             </svg>
           </button>
+          <form class="sidebar-action-form" method="post" action="/daily">
+            <input name="offset" type="hidden" value="0">
+            <button class="sidebar-action daily-action" type="submit" aria-label="Open today's note" title="Open today's note">Today</button>
+          </form>
+          <form class="sidebar-action-form" method="post" action="/daily">
+            <input name="offset" type="hidden" value="1">
+            <button class="sidebar-action daily-action" type="submit" aria-label="Open tomorrow's note" title="Open tomorrow's note">Tomorrow</button>
+          </form>
+          <button class="sidebar-action drawer-close" id="drawer-close" type="button" aria-label="Close files" title="Close files">×</button>
         </div>
         <div class="tree-drop-zone" id="tree-drop-zone">
           {{ render_tree(note_tree) }}
         </div>
       </aside>
+      <button class="drawer-backdrop" id="drawer-backdrop" type="button" aria-label="Close files" tabindex="-1"></button>
 
       <dialog id="directory-dialog">
         <form class="directory-form" method="post" action="/directory">
@@ -438,10 +181,13 @@
       <main class="workspace">
         <form class="note-form" id="note-form" method="post">
           <div class="editor-bar">
-            <span class="printer-status disconnected" id="printer-status" role="status">
-              <span class="printer-status-dot" aria-hidden="true"></span>
-              <span id="printer-status-label">Printer disconnected</span>
-            </span>
+            <div class="printer-status-group">
+              <span class="printer-status disconnected" id="printer-status" role="status">
+                <span class="printer-status-dot" aria-hidden="true"></span>
+                <span id="printer-status-label">Printer disconnected</span>
+              </span>
+              <button class="printer-refresh" id="printer-refresh" type="button">Refresh</button>
+            </div>
           </div>
           <div class="path-row">
             <label for="title">Title</label>
@@ -459,62 +205,102 @@
             </div>
           </div>
 
-          <div class="format-row" aria-label="Receipt text format">
-            <fieldset class="format-group">
-              <legend>Font</legend>
-              <label class="format-option">
-                <input type="radio" name="font" value="a" {% if style.font == "a" %}checked{% endif %}>
-                <span>A</span>
-              </label>
-              <label class="format-option">
-                <input type="radio" name="font" value="b" {% if style.font == "b" %}checked{% endif %}>
-                <span>B</span>
-              </label>
-            </fieldset>
+          <div class="schedule-row" data-saved="{{ 'true' if is_saved else 'false' }}">
+            <button
+              class="schedule-toggle"
+              id="schedule-toggle"
+              type="button"
+              aria-controls="schedule-controls"
+              aria-pressed="{{ 'true' if schedule_status.scheduled else 'false' }}"
+              title="{% if is_saved %}Schedule this note to print once{% else %}Save the note before scheduling{% endif %}"
+              {% if not is_saved %}disabled{% endif %}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="8"></circle>
+                <path d="M12 7v5l3 2"></path>
+              </svg>
+              Schedule
+            </button>
+            <div class="schedule-controls" id="schedule-controls"{% if not schedule_status.scheduled %} hidden{% endif %}>
+              <label for="schedule-at">Print at</label>
+              <input
+                id="schedule-at"
+                type="datetime-local"
+                min="{{ schedule_minimum }}"
+                value="{{ schedule_status.scheduled_at or '' }}"
+              >
+              <span class="schedule-timezone">{{ schedule_timezone_label }}</span>
+            </div>
+            <span class="schedule-message" id="schedule-message" role="status" aria-live="polite">
+              {% if not is_saved %}Save first{% elif schedule_status.scheduled %}Scheduled{% else %}Not scheduled{% endif %}
+            </span>
+          </div>
 
-            <fieldset class="format-group size-options">
-              <legend>Size</legend>
-              <label class="format-option">
-                <input type="radio" name="size" value="normal" {% if style.size == "normal" %}checked{% endif %}>
-                <span>Normal</span>
-              </label>
-              <label class="format-option">
-                <input type="radio" name="size" value="double-width" {% if style.size == "double-width" %}checked{% endif %}>
-                <span>2W</span>
-              </label>
-              <label class="format-option">
-                <input type="radio" name="size" value="double-height" {% if style.size == "double-height" %}checked{% endif %}>
-                <span>2H</span>
-              </label>
-              <label class="format-option">
-                <input type="radio" name="size" value="double" {% if style.size == "double" %}checked{% endif %}>
-                <span>2×</span>
-              </label>
-            </fieldset>
+          <div class="markdown-toolbar" aria-label="Receipt formatting">
+            <button type="button" data-tool="size" data-size="large" aria-pressed="false" title="Font A, 2× size">Large</button>
+            <button type="button" data-tool="size" data-size="medium" aria-pressed="false" title="Font A, normal size">Medium</button>
+            <button type="button" data-tool="size" data-size="small" aria-pressed="false" title="Font B, normal size">Small</button>
+            <span class="toolbar-separator" aria-hidden="true"></span>
+            <button type="button" data-tool="inline" data-command="underline" aria-pressed="false" title="Underline"><u>U</u></button>
+            <button type="button" data-tool="inline" data-command="invert" aria-pressed="false" title="Reverse text (white on black)">Reverse</button>
+            <button type="button" data-tool="bullet" aria-pressed="false" title="Toggle bulleted list">&bull; Bullet</button>
+            <button type="button" data-tool="rule" title="Add horizontal line">Add Line</button>
+            <span class="toolbar-separator" aria-hidden="true"></span>
+            <button type="button" data-tool="alignment" data-align="left" aria-pressed="false" title="Align left">Left</button>
+            <button type="button" data-tool="alignment" data-align="center" aria-pressed="false" title="Align center">Center</button>
+            <button type="button" data-tool="alignment" data-align="right" aria-pressed="false" title="Align right">Right</button>
           </div>
 
           <div class="editor-stage">
-            <div class="receipt" id="receipt" data-font="{{ style.font }}" data-width="{{ style.width }}" data-height="{{ style.height }}">
-              <div class="receipt-viewport">
-                <label for="content" class="sr-only">Note content</label>
-                <textarea
-                  id="content"
-                  name="content"
-                  cols="{{ columns }}"
-                  wrap="hard"
+            <div
+              class="beautify-overlay"
+              id="beautify-overlay"
+              role="status"
+              aria-live="polite"
+              aria-hidden="true"
+              hidden
+            >
+              <div class="beautify-wait">
+                <span class="beautify-spinner" aria-hidden="true"></span>
+                <span>Beautifying receipt…</span>
+              </div>
+            </div>
+            <div class="receipt-scale-frame" id="receipt-scale-frame">
+              <div class="receipt editor-receipt" id="editor-receipt">
+                <div class="print-boundary" id="print-boundary" aria-hidden="true"></div>
+                <label for="receipt-editor" class="sr-only">Note content</label>
+                <div
+                  id="receipt-editor"
+                  class="receipt-editor"
+                  contenteditable="true"
+                  role="textbox"
+                  aria-multiline="true"
+                  aria-label="Note content"
                   spellcheck="false"
                   autocapitalize="off"
-                  autofocus
-                  placeholder="Type a small note..."
-                >{{ content }}</textarea>
+                  data-placeholder="Type a small note..."
+                ></div>
+                <textarea id="content" name="content" hidden>{{ content }}</textarea>
               </div>
             </div>
           </div>
 
-          <p class="ascii-warning" id="ascii-warning" role="alert" hidden>Receipt notes support printable ASCII only.</p>
+          <p class="ascii-warning" id="ascii-warning" role="alert" hidden>Receipt Markdown supports printable ASCII only.</p>
 
           <div class="form-actions">
-            <span class="save-state" id="save-state">Ready</span>
+            <div class="beautify-actions">
+              <button class="button beautify-action" id="beautify-button" type="button" title="Format this receipt with local AI">Beautify</button>
+              <button class="button secondary" id="clear-button" type="button" title="Clear the receipt body">Clear</button>
+              <button
+                class="button secondary undo-beautify"
+                id="undo-beautify"
+                type="button"
+                aria-label="Undo Beautify"
+                title="Restore the receipt from before Beautify"
+                hidden
+              >Undo</button>
+            </div>
+            <span class="save-state" id="save-state" role="status" aria-live="polite">Ready</span>
             <div class="button-group">
               <button class="button secondary" id="save-button" type="submit" formaction="/save">Save</button>
               <button class="button primary" type="submit" formaction="/print">Print</button>
@@ -531,48 +317,318 @@
       const form = document.querySelector("#note-form");
       const titleInput = document.querySelector("#title");
       const noteDirectory = document.querySelector("#note-directory");
+      const originalPathInput = form.querySelector('input[name="original_path"]');
       const content = document.querySelector("#content");
+      const receiptEditor = document.querySelector("#receipt-editor");
+      const editorStage = document.querySelector(".editor-stage");
+      const receiptScaleFrame = document.querySelector("#receipt-scale-frame");
+      const editorReceipt = document.querySelector("#editor-receipt");
+      const printBoundary = document.querySelector("#print-boundary");
       const saveButton = document.querySelector("#save-button");
       const saveState = document.querySelector("#save-state");
-      const receipt = document.querySelector("#receipt");
+      const beautifyButton = document.querySelector("#beautify-button");
+      const clearButton = document.querySelector("#clear-button");
+      const undoBeautify = document.querySelector("#undo-beautify");
+      const beautifyOverlay = document.querySelector("#beautify-overlay");
       const printerStatus = document.querySelector("#printer-status");
       const printerStatusLabel = document.querySelector("#printer-status-label");
-      const fontInputs = Array.from(document.querySelectorAll('input[name="font"]'));
-      const sizeInputs = Array.from(document.querySelectorAll('input[name="size"]'));
+      const printerRefresh = document.querySelector("#printer-refresh");
       const asciiWarning = document.querySelector("#ascii-warning");
+      const successNotice = document.querySelector(".notice.success");
       const directoryDialog = document.querySelector("#directory-dialog");
+      const directoryForm = directoryDialog.querySelector("form");
       const directoryName = document.querySelector("#directory-name");
+      const directoryCurrentPath = directoryForm.querySelector('[name="current_path"]');
+      const directoryCreateButton = directoryForm.querySelector('button[type="submit"]');
       const deleteDialog = document.querySelector("#delete-dialog");
       const deleteHeading = document.querySelector("#delete-heading");
       const deleteWarning = document.querySelector("#delete-warning");
       const deletePath = document.querySelector("#delete-path");
       const deleteCurrentPath = document.querySelector("#delete-current-path");
       const treeDropZone = document.querySelector("#tree-drop-zone");
-      const originalSavedPath = {{ (selected_path if is_saved else "")|tojson }};
-      const fontMetrics = { a: { columns: 42 }, b: { columns: 56 } };
-      const sizeMetrics = {
-        normal: { width: 1, height: 1, label: "NORMAL" },
-        "double-width": { width: 2, height: 1, label: "DOUBLE WIDTH" },
-        "double-height": { width: 1, height: 2, label: "DOUBLE HEIGHT" },
-        double: { width: 2, height: 2, label: "DOUBLE SIZE" },
-      };
+      const scheduleToggle = document.querySelector("#schedule-toggle");
+      const scheduleControls = document.querySelector("#schedule-controls");
+      const scheduleAt = document.querySelector("#schedule-at");
+      const scheduleMessage = document.querySelector("#schedule-message");
+      const fileSidebar = document.querySelector("#file-sidebar");
+      const workspace = document.querySelector(".workspace");
+      const mobileFilesButton = document.querySelector("#mobile-files-button");
+      const drawerClose = document.querySelector("#drawer-close");
+      const drawerBackdrop = document.querySelector("#drawer-backdrop");
+      const mobileLayout = window.matchMedia("(max-width: 760px)");
+      let originalSavedPath = {{ (selected_path if is_saved else "")|tojson }};
+      const initialEditorState = {{ editor_state|tojson }};
+      const initialScheduleStatus = {{ schedule_status|tojson }};
 
-      function selectedFormat() {
-        const font = fontInputs.find((input) => input.checked)?.value || "a";
-        const size = sizeInputs.find((input) => input.checked)?.value || "normal";
-        return { font, size, ...sizeMetrics[size] };
+      if (successNotice) {
+        const cleanUrl = new URL(window.location.href);
+        if (cleanUrl.searchParams.has("saved")) {
+          cleanUrl.searchParams.delete("saved");
+          window.history.replaceState(null, "", `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+        }
+        window.setTimeout(() => successNotice.remove(), 3500);
       }
 
       function currentValue() {
-        const format = selectedFormat();
-        return `${titleInput.value}\u0000${content.value}\u0000${format.font}\u0000${format.size}`;
+        return `${titleInput.value}\u0000${content.value}`;
       }
 
-      const initialValue = currentValue();
+      let initialValue = "";
+      let beautifyUndoSnapshot = null;
+      let applyingBeautify = false;
+      let autosaveEnabled = Boolean(originalSavedPath);
+      let autosaveTimer = null;
+      let autosaveInFlight = null;
+      let autosaveQueued = false;
+      let autosaveNoticeTimer = null;
+      let formSubmitting = false;
+      let pendingSubmitter = null;
+      let suppressAutosaveNavigation = false;
 
-      async function updatePrinterStatus() {
+      function currentNotePath() {
+        const normalizedTitle = titleInput.value.trim().replace(/\.md$/i, "").trim();
+        if (
+          !normalizedTitle
+          || normalizedTitle === "."
+          || normalizedTitle === ".."
+          || /[\\/]/.test(normalizedTitle)
+          || /[^\x20-\x7E]/.test(normalizedTitle)
+        ) return "";
+        return noteDirectory.value
+          ? `${noteDirectory.value}/${normalizedTitle}.md`
+          : `${normalizedTitle}.md`;
+      }
+
+      function queueAutosave(delay = 900) {
+        window.clearTimeout(autosaveTimer);
+        if (
+          !autosaveEnabled
+          || formSubmitting
+          || !currentNotePath()
+          || /[^\x20-\x7E\r\n]/.test(content.value)
+          || !hasUnsavedChanges()
+        ) return;
+        autosaveTimer = window.setTimeout(() => performAutosave(), delay);
+      }
+
+      async function performAutosave({ allowNavigation = true } = {}) {
+        autosaveTimer = null;
+        if (formSubmitting || !autosaveEnabled || !hasUnsavedChanges()) return false;
+        if (autosaveInFlight) {
+          autosaveQueued = true;
+          return false;
+        }
+
+        syncSource();
+        const submittedValue = currentValue();
+        const submittedPath = currentNotePath();
+        const previousPath = originalSavedPath;
+        if (!submittedPath || /[^\x20-\x7E\r\n]/.test(content.value)) return false;
+
+        window.clearTimeout(autosaveNoticeTimer);
+        saveState.textContent = "Saving…";
+        saveState.classList.remove("saved");
+
+        autosaveInFlight = (async () => {
+          const response = await fetch("/autosave", {
+            method: "POST",
+            headers: { "Accept": "application/json" },
+            body: new URLSearchParams({
+              title: titleInput.value,
+              directory: noteDirectory.value,
+              original_path: previousPath,
+              content: content.value,
+            }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.error || "Autosave failed.");
+
+          initialValue = submittedValue;
+          originalSavedPath = result.path;
+          originalPathInput.value = result.path;
+          directoryCurrentPath.value = result.path;
+          const unchanged = currentValue() === submittedValue;
+          const pathChanged = result.path !== previousPath;
+
+          if (unchanged) {
+            saveState.textContent = "Saved";
+            saveState.classList.remove("unsaved");
+            saveState.classList.add("saved");
+          } else {
+            autosaveQueued = true;
+            updateEditor();
+          }
+
+          if (
+            allowNavigation
+            && !suppressAutosaveNavigation
+            && pathChanged
+            && unchanged
+            && !pendingSubmitter
+          ) {
+            window.location.replace(`/?path=${encodeURIComponent(result.path)}`);
+            return;
+          }
+
+          if (unchanged) {
+            autosaveNoticeTimer = window.setTimeout(() => {
+              if (!hasUnsavedChanges()) updateEditor();
+            }, 1800);
+          }
+        })();
+
+        let saved = false;
         try {
-          const response = await fetch("/printer-status", { headers: { "Accept": "application/json" } });
+          await autosaveInFlight;
+          saved = true;
+        } catch (error) {
+          saveState.textContent = error.message || "Autosave failed.";
+          saveState.classList.add("unsaved");
+          saveState.classList.remove("saved");
+        } finally {
+          autosaveInFlight = null;
+          if (pendingSubmitter) {
+            const submitter = pendingSubmitter;
+            pendingSubmitter = null;
+            form.requestSubmit(submitter);
+          } else if (autosaveQueued) {
+            autosaveQueued = false;
+            queueAutosave(0);
+          }
+        }
+        return saved;
+      }
+
+      function clearBeautifyUndo() {
+        beautifyUndoSnapshot = null;
+        undoBeautify.hidden = true;
+      }
+
+      function setBeautifyWaiting(waiting) {
+        editorStage.classList.toggle("beautifying", waiting);
+        beautifyOverlay.hidden = !waiting;
+        beautifyOverlay.setAttribute("aria-hidden", String(!waiting));
+        receiptEditor.inert = waiting;
+        receiptEditor.setAttribute("aria-busy", String(waiting));
+        clearButton.disabled = waiting;
+      }
+
+      function clearReceipt() {
+        clearBeautifyUndo();
+        clearSelectedRule();
+        savedEditorRange = null;
+        renderEditorDocument({ blocks: [] });
+        syncSource();
+        updateEditor();
+        updateToolbarState();
+        queueAutosave();
+        receiptEditor.focus();
+      }
+
+      async function beautifyReceipt() {
+        syncSource();
+        const requestedSource = content.value;
+        let editorWasReplaced = false;
+        const snapshot = {
+          html: receiptEditor.innerHTML,
+          source: requestedSource,
+        };
+        beautifyButton.disabled = true;
+        beautifyButton.setAttribute("aria-busy", "true");
+        beautifyButton.textContent = "Beautifying…";
+        setBeautifyWaiting(true);
+        saveState.textContent = "Beautifying…";
+        saveState.classList.remove("unsaved");
+
+        try {
+          const response = await fetch("/beautify", {
+            method: "POST",
+            headers: {
+              "Accept": "application/json",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ content: requestedSource }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.error || "The receipt could not be beautified.");
+
+          syncSource();
+          if (content.value !== requestedSource) {
+            throw new Error("The note changed, so the Beautify result was not applied.");
+          }
+          if (!result.editor_state || typeof result.content !== "string") {
+            throw new Error("The model returned an invalid receipt.");
+          }
+
+          applyingBeautify = true;
+          clearSelectedRule();
+          savedEditorRange = null;
+          renderEditorDocument(result.editor_state);
+          editorWasReplaced = true;
+          syncSource();
+          if (content.value !== result.content) {
+            throw new Error("The Beautify result could not be rendered safely.");
+          }
+          beautifyUndoSnapshot = snapshot;
+          undoBeautify.hidden = false;
+          updateEditor();
+          updateToolbarState();
+          saveState.textContent = "Beautified — unsaved changes";
+          saveState.classList.add("unsaved");
+          queueAutosave();
+        } catch (error) {
+          if (editorWasReplaced) {
+            receiptEditor.innerHTML = snapshot.html;
+            content.value = snapshot.source;
+            syncSource();
+            updateEditor();
+            updateToolbarState();
+          }
+          saveState.textContent = error.message || "The receipt could not be beautified.";
+          saveState.classList.add("unsaved");
+        } finally {
+          applyingBeautify = false;
+          beautifyButton.disabled = false;
+          beautifyButton.removeAttribute("aria-busy");
+          beautifyButton.textContent = "Beautify";
+          setBeautifyWaiting(false);
+        }
+      }
+
+      function undoLastBeautify() {
+        if (!beautifyUndoSnapshot) return;
+        const snapshot = beautifyUndoSnapshot;
+        applyingBeautify = true;
+        clearSelectedRule();
+        savedEditorRange = null;
+        receiptEditor.innerHTML = snapshot.html;
+        content.value = snapshot.source;
+        syncSource();
+        applyingBeautify = false;
+        clearBeautifyUndo();
+        updateEditor();
+        updateToolbarState();
+        const changed = hasUnsavedChanges();
+        saveState.textContent = changed ? "Beautify undone — unsaved changes" : "Beautify undone";
+        saveState.classList.toggle("unsaved", changed);
+        queueAutosave();
+        receiptEditor.focus();
+      }
+
+      beautifyButton.addEventListener("click", beautifyReceipt);
+      clearButton.addEventListener("click", clearReceipt);
+      undoBeautify.addEventListener("click", undoLastBeautify);
+
+      async function updatePrinterStatus({ manual = false } = {}) {
+        if (manual) {
+          printerRefresh.disabled = true;
+          printerRefresh.textContent = "Checking…";
+        }
+        try {
+          const response = await fetch("/printer-status", {
+            cache: "no-store",
+            headers: { "Accept": "application/json" },
+          });
           if (!response.ok) throw new Error("Printer status unavailable");
           const status = await response.json();
           printerStatus.classList.toggle("connected", status.connected);
@@ -582,12 +638,212 @@
           printerStatus.classList.remove("connected");
           printerStatus.classList.add("disconnected");
           printerStatusLabel.textContent = "Printer disconnected";
+        } finally {
+          if (manual) {
+            printerRefresh.disabled = false;
+            printerRefresh.textContent = "Refresh";
+          }
         }
       }
 
+      printerRefresh.addEventListener("click", () => updatePrinterStatus({ manual: true }));
+
+      let scheduleActive = Boolean(initialScheduleStatus.scheduled);
+      let schedulePanelOpen = scheduleActive;
+      let persistedScheduleAt = initialScheduleStatus.scheduled_at || "";
+
+      function setScheduleMessage(message, isError = false) {
+        scheduleMessage.textContent = message;
+        scheduleMessage.classList.toggle("error", isError);
+      }
+
+      function renderScheduleStatus(status, { keepPanelOpen = false } = {}) {
+        if (!originalSavedPath) {
+          scheduleActive = false;
+          schedulePanelOpen = false;
+          scheduleToggle.setAttribute("aria-pressed", "false");
+          scheduleControls.hidden = true;
+          setScheduleMessage("Save first");
+          return;
+        }
+        scheduleActive = Boolean(status.scheduled);
+        persistedScheduleAt = status.scheduled_at || "";
+        schedulePanelOpen = scheduleActive || (keepPanelOpen && schedulePanelOpen);
+        scheduleToggle.setAttribute("aria-pressed", String(schedulePanelOpen));
+        scheduleControls.hidden = !schedulePanelOpen;
+        scheduleAt.value = status.scheduled_at || "";
+        setScheduleMessage(
+          scheduleActive ? "Scheduled" : schedulePanelOpen ? "Choose a date and time" : "Not scheduled",
+        );
+      }
+
+      async function updateNoteSchedule(scheduledAt) {
+        const previous = {
+          scheduled: scheduleActive,
+          scheduled_at: persistedScheduleAt,
+          timezone: initialScheduleStatus.timezone,
+        };
+        scheduleToggle.disabled = true;
+        scheduleAt.disabled = true;
+        setScheduleMessage(scheduledAt ? "Scheduling…" : "Cancelling…");
+        try {
+          const response = await fetch("/schedule", {
+            method: "POST",
+            headers: { "Accept": "application/json" },
+            body: new URLSearchParams({
+              path: originalSavedPath,
+              scheduled_at: scheduledAt,
+            }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.error || "The schedule could not be updated.");
+          renderScheduleStatus(result);
+        } catch (error) {
+          renderScheduleStatus(previous, { keepPanelOpen: true });
+          setScheduleMessage(error.message || "The schedule could not be updated.", true);
+        } finally {
+          scheduleToggle.disabled = false;
+          scheduleAt.disabled = false;
+        }
+      }
+
+      scheduleToggle.addEventListener("click", () => {
+        if (!originalSavedPath) return;
+        if (scheduleActive) {
+          updateNoteSchedule("");
+          return;
+        }
+        schedulePanelOpen = !schedulePanelOpen;
+        scheduleToggle.setAttribute("aria-pressed", String(schedulePanelOpen));
+        scheduleControls.hidden = !schedulePanelOpen;
+        setScheduleMessage(schedulePanelOpen ? "Choose a date and time" : "Not scheduled");
+        if (schedulePanelOpen) scheduleAt.focus();
+      });
+
+      scheduleAt.addEventListener("change", () => {
+        if (scheduleAt.value) updateNoteSchedule(scheduleAt.value);
+      });
+
+      async function refreshScheduleStatus() {
+        if (!originalSavedPath || !scheduleActive) return;
+        try {
+          const response = await fetch(`/schedule-status?path=${encodeURIComponent(originalSavedPath)}`, {
+            cache: "no-store",
+            headers: { "Accept": "application/json" },
+          });
+          if (!response.ok) return;
+          renderScheduleStatus(await response.json());
+        } catch (_) {}
+      }
+
+      renderScheduleStatus(initialScheduleStatus);
+
+      let drawerPreviousFocus = null;
+
+      function drawerIsOpen() {
+        return document.body.classList.contains("drawer-open");
+      }
+
+      function openDrawer() {
+        if (!mobileLayout.matches || drawerIsOpen()) return;
+        drawerPreviousFocus = document.activeElement;
+        document.body.classList.add("drawer-open");
+        mobileFilesButton.setAttribute("aria-expanded", "true");
+        fileSidebar.removeAttribute("aria-hidden");
+        workspace.setAttribute("inert", "");
+        drawerClose.focus();
+      }
+
+      function closeDrawer({ restoreFocus = true } = {}) {
+        if (!drawerIsOpen()) return;
+        document.body.classList.remove("drawer-open");
+        mobileFilesButton.setAttribute("aria-expanded", "false");
+        workspace.removeAttribute("inert");
+        if (mobileLayout.matches) fileSidebar.setAttribute("aria-hidden", "true");
+        if (restoreFocus) (drawerPreviousFocus || mobileFilesButton).focus();
+      }
+
+      function syncDrawerLayout() {
+        if (mobileLayout.matches) {
+          if (!drawerIsOpen()) fileSidebar.setAttribute("aria-hidden", "true");
+        } else {
+          document.body.classList.remove("drawer-open");
+          fileSidebar.removeAttribute("aria-hidden");
+          workspace.removeAttribute("inert");
+          mobileFilesButton.setAttribute("aria-expanded", "false");
+        }
+      }
+
+      mobileFilesButton.addEventListener("click", openDrawer);
+      drawerClose.addEventListener("click", () => closeDrawer());
+      drawerBackdrop.addEventListener("click", () => closeDrawer());
+      mobileLayout.addEventListener("change", syncDrawerLayout);
+      syncDrawerLayout();
+
+      document.addEventListener("keydown", (event) => {
+        if (!drawerIsOpen()) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeDrawer();
+          return;
+        }
+        if (event.key !== "Tab") return;
+        const focusable = Array.from(fileSidebar.querySelectorAll("a[href], button:not([disabled])"))
+          .filter((element) => element.getClientRects().length);
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      });
+
       document.querySelector("#new-directory-button").addEventListener("click", () => {
+        closeDrawer({ restoreFocus: false });
         directoryDialog.showModal();
         directoryName.focus();
+      });
+      directoryForm.addEventListener("submit", async (event) => {
+        if (!hasUnsavedChanges()) return;
+        event.preventDefault();
+        window.clearTimeout(autosaveTimer);
+
+        if (!autosaveEnabled || !currentNotePath()) {
+          directoryDialog.close();
+          saveState.textContent = "Name the note before creating a directory";
+          saveState.classList.add("unsaved");
+          titleInput.focus();
+          return;
+        }
+
+        directoryCreateButton.disabled = true;
+        directoryCreateButton.textContent = "Saving note…";
+        suppressAutosaveNavigation = true;
+        try {
+          if (autosaveInFlight) {
+            try { await autosaveInFlight; } catch (_) {}
+            await Promise.resolve();
+          }
+          window.clearTimeout(autosaveTimer);
+          autosaveQueued = false;
+          const saved = !hasUnsavedChanges()
+            || await performAutosave({ allowNavigation: false });
+          if (!saved || hasUnsavedChanges()) {
+            directoryDialog.close();
+            return;
+          }
+          HTMLFormElement.prototype.submit.call(directoryForm);
+        } finally {
+          suppressAutosaveNavigation = false;
+          if (directoryCreateButton.isConnected) {
+            directoryCreateButton.disabled = false;
+            directoryCreateButton.textContent = "Create directory";
+          }
+        }
       });
       document.querySelector("#cancel-directory").addEventListener("click", () => directoryDialog.close());
       document.querySelector("#cancel-delete").addEventListener("click", () => deleteDialog.close());
@@ -662,11 +918,11 @@
 
       function updateProposedLocation() {
         document.querySelectorAll('[data-proposed-node="true"]').forEach((node) => node.remove());
-        const normalizedTitle = titleInput.value.trim().replace(/\.txt$/i, "").trim();
+        const normalizedTitle = titleInput.value.trim().replace(/\.md$/i, "").trim();
         if (!normalizedTitle || normalizedTitle === "." || normalizedTitle === ".." || /[\\/]/.test(normalizedTitle)) return;
         const proposedPath = noteDirectory.value
-          ? `${noteDirectory.value}/${normalizedTitle}.txt`
-          : `${normalizedTitle}.txt`;
+          ? `${noteDirectory.value}/${normalizedTitle}.md`
+          : `${normalizedTitle}.md`;
         const parts = proposedPath.split("/").filter(Boolean);
         if (originalSavedPath && proposedPath === originalSavedPath) return;
 
@@ -684,7 +940,6 @@
             .find((folder) => folder.dataset.treePath === currentPath);
           if (existingFolder) {
             existingFolder.open = true;
-            existingFolder.querySelector(".tree-empty")?.remove();
             let childList = directTreeList(existingFolder);
             if (!childList) {
               childList = document.createElement("ul");
@@ -722,6 +977,7 @@
             : "The note will be permanently deleted.";
           deletePath.value = button.dataset.deletePath;
           deleteCurrentPath.value = originalSavedPath;
+          closeDrawer({ restoreFocus: false });
           deleteDialog.showModal();
         });
       });
@@ -732,8 +988,40 @@
       }
 
       function folderDropTarget(eventTarget) {
-        const target = eventTarget.closest("[data-folder-drop-path]");
+        let target = eventTarget?.closest?.("[data-folder-drop-path]");
+        if (!target) {
+          const parentFolder = eventTarget?.closest?.(".tree-folder[data-tree-path]");
+          target = parentFolder
+            ? Array.from(parentFolder.children).find((child) => child.matches?.("summary[data-folder-drop-path]"))
+            : null;
+        }
         return target && treeDropZone.contains(target) ? target : null;
+      }
+
+      async function moveTreeItem(source, destination) {
+        try {
+          const response = await fetch("/move", {
+            method: "POST",
+            headers: { "Accept": "application/json" },
+            body: new URLSearchParams({ source, destination }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.error || "The item could not be moved.");
+
+          const currentSuffix = originalSavedPath === source
+            ? ""
+            : originalSavedPath.startsWith(`${source}/`)
+              ? originalSavedPath.slice(source.length)
+              : null;
+          if (currentSuffix !== null) {
+            window.location.assign(`/?path=${encodeURIComponent(result.path + currentSuffix)}`);
+          } else {
+            window.location.reload();
+          }
+        } catch (error) {
+          saveState.textContent = error.message || "The item could not be moved.";
+          saveState.classList.add("unsaved");
+        }
       }
 
       let draggedElement = null;
@@ -769,30 +1057,9 @@
         const folder = folderDropTarget(event.target);
         const destination = folder ? folder.dataset.folderDropPath : "";
         clearDropHighlight();
-
-        const response = await fetch("/move", {
-          method: "POST",
-          headers: { "Accept": "application/json" },
-          body: new URLSearchParams({ source, destination }),
-        });
-        const result = await response.json();
-        if (!response.ok) {
-          window.alert(result.error || "The item could not be moved.");
-          draggedElement.classList.remove("dragging");
-          draggedElement = null;
-          return;
-        }
-
-        const currentSuffix = originalSavedPath === source
-          ? ""
-          : originalSavedPath.startsWith(`${source}/`)
-            ? originalSavedPath.slice(source.length)
-            : null;
-        if (currentSuffix !== null) {
-          window.location.assign(`/?path=${encodeURIComponent(result.path + currentSuffix)}`);
-        } else {
-          window.location.reload();
-        }
+        draggedElement.classList.remove("dragging");
+        draggedElement = null;
+        await moveTreeItem(source, destination);
       });
 
       treeDropZone.addEventListener("dragend", () => {
@@ -801,46 +1068,1004 @@
         draggedElement = null;
       });
 
-      function updateEditor() {
-        const format = selectedFormat();
-        const columns = Math.floor(fontMetrics[format.font].columns / format.width);
-        receipt.dataset.font = format.font;
-        receipt.dataset.width = String(format.width);
-        receipt.dataset.height = String(format.height);
-        content.cols = columns;
+      const touchDragDelay = 400;
+      let touchDrag = null;
+      let suppressTouchHandleClick = false;
 
-        const normalizedTitle = titleInput.value.trim().replace(/\.txt$/i, "").trim();
+      function sourceParentPath(source) {
+        const separator = source.lastIndexOf("/");
+        return separator < 0 ? "" : source.slice(0, separator);
+      }
+
+      function validTouchDestination(source, destination) {
+        if (destination === null || destination === sourceParentPath(source)) return false;
+        return destination !== source && !destination.startsWith(`${source}/`);
+      }
+
+      function touchDestinationAt(x, y, source) {
+        const element = document.elementFromPoint(x, y);
+        if (!element || !treeDropZone.contains(element)) return null;
+        const folder = folderDropTarget(element);
+        const destination = folder?.dataset.folderDropPath || "";
+        return validTouchDestination(source, destination) ? destination : null;
+      }
+
+      function showTouchDestination(destination) {
+        clearDropHighlight();
+        if (destination === null) return;
+        if (!destination) {
+          treeDropZone.classList.add("root-drop-target");
+          return;
+        }
+        const folder = Array.from(document.querySelectorAll("[data-folder-drop-path]"))
+          .find((candidate) => candidate.dataset.folderDropPath === destination);
+        folder?.classList.add("drop-target");
+      }
+
+      function positionTouchGhost(x, y) {
+        if (!touchDrag?.ghost) return;
+        touchDrag.ghost.style.transform = `translate(${x + 12}px, ${y + 12}px)`;
+      }
+
+      function beginTouchDrag() {
+        if (!touchDrag || touchDrag.active) return;
+        touchDrag.active = true;
+        suppressTouchHandleClick = true;
+        document.body.classList.add("touch-drag-active");
+        touchDrag.sourceElement = Array.from(document.querySelectorAll("[data-drag-path]"))
+          .find((candidate) => candidate.dataset.dragPath === touchDrag.source);
+        touchDrag.sourceElement?.classList.add("dragging");
+        touchDrag.ghost = document.createElement("div");
+        touchDrag.ghost.className = "touch-drag-ghost";
+        touchDrag.ghost.textContent = touchDrag.name;
+        document.body.append(touchDrag.ghost);
+        positionTouchGhost(touchDrag.x, touchDrag.y);
+      }
+
+      function updateTouchDrag(event) {
+        if (!touchDrag || event.pointerId !== touchDrag.pointerId) return;
+        touchDrag.x = event.clientX;
+        touchDrag.y = event.clientY;
+        if (!touchDrag.active) {
+          if (Math.hypot(event.clientX - touchDrag.startX, event.clientY - touchDrag.startY) > 10) {
+            window.clearTimeout(touchDrag.timer);
+          }
+          return;
+        }
+        event.preventDefault();
+        positionTouchGhost(event.clientX, event.clientY);
+        touchDrag.destination = touchDestinationAt(event.clientX, event.clientY, touchDrag.source);
+        showTouchDestination(touchDrag.destination);
+
+        const sidebarBox = fileSidebar.getBoundingClientRect();
+        if (event.clientY < sidebarBox.top + 64) fileSidebar.scrollTop -= 14;
+        if (event.clientY > sidebarBox.bottom - 64) fileSidebar.scrollTop += 14;
+      }
+
+      function clearTouchDrag() {
+        if (!touchDrag) return;
+        window.clearTimeout(touchDrag.timer);
+        touchDrag.sourceElement?.classList.remove("dragging");
+        touchDrag.ghost?.remove();
+        document.body.classList.remove("touch-drag-active");
+        clearDropHighlight();
+        touchDrag = null;
+      }
+
+      async function finishTouchDrag(event, cancelled = false) {
+        if (!touchDrag || event.pointerId !== touchDrag.pointerId) return;
+        const wasActive = touchDrag.active;
+        const source = touchDrag.source;
+        const destination = touchDrag.destination;
+        clearTouchDrag();
+        if (wasActive) event.preventDefault();
+        window.setTimeout(() => { suppressTouchHandleClick = false; }, 0);
+        if (!cancelled && wasActive && destination !== null) {
+          await moveTreeItem(source, destination);
+        }
+      }
+
+      document.querySelectorAll(".tree-drag-handle").forEach((handle) => {
+        handle.addEventListener("contextmenu", (event) => event.preventDefault());
+        handle.addEventListener("click", (event) => {
+          if (!suppressTouchHandleClick) return;
+          event.preventDefault();
+          event.stopPropagation();
+          suppressTouchHandleClick = false;
+        });
+        handle.addEventListener("pointerdown", (event) => {
+          if (event.pointerType === "mouse" || !mobileLayout.matches) return;
+          if (touchDrag) return;
+          if (hasUnsavedChanges()) {
+            saveState.textContent = "Save changes before moving items";
+            saveState.classList.add("unsaved");
+            return;
+          }
+          handle.setPointerCapture(event.pointerId);
+          touchDrag = {
+            active: false,
+            destination: null,
+            ghost: null,
+            handle,
+            name: handle.dataset.touchDragName,
+            pointerId: event.pointerId,
+            source: handle.dataset.touchDragPath,
+            sourceElement: null,
+            startX: event.clientX,
+            startY: event.clientY,
+            x: event.clientX,
+            y: event.clientY,
+          };
+          touchDrag.timer = window.setTimeout(beginTouchDrag, touchDragDelay);
+        });
+        handle.addEventListener("pointermove", updateTouchDrag);
+        handle.addEventListener("pointerup", (event) => finishTouchDrag(event));
+        handle.addEventListener("pointercancel", (event) => finishTouchDrag(event, true));
+      });
+
+      function makeInlineRun(run) {
+        let node = document.createTextNode(run.text);
+        if (run.underline) {
+          const underline = document.createElement("u");
+          underline.append(node);
+          node = underline;
+        }
+        if (run.invert) {
+          const reverse = document.createElement("span");
+          reverse.className = "receipt-reverse";
+          reverse.append(node);
+          node = reverse;
+        }
+        return node;
+      }
+
+      function makeReceiptBlock(block = {}) {
+        const element = document.createElement("div");
+        element.className = "receipt-block";
+        element.dataset.kind = block.kind || "paragraph";
+        element.dataset.align = block.align || "left";
+        element.dataset.font = block.style?.font || "a";
+        element.dataset.width = String(Number(block.style?.width || 1));
+        element.dataset.height = String(Number(block.style?.height || 1));
+
+        if (element.dataset.kind === "rule") {
+          element.contentEditable = "false";
+          element.tabIndex = 0;
+          element.setAttribute("role", "separator");
+          element.setAttribute("aria-label", "Horizontal rule. Press Delete or Backspace to remove.");
+          element.title = "Click to select; press Delete or Backspace to remove";
+          element.append(document.createElement("hr"));
+          return element;
+        }
+
+        renderInlineSegments(element, block.runs || []);
+        return element;
+      }
+
+      function renderEditorDocument(editorState) {
+        const fragment = document.createDocumentFragment();
+        editorState.blocks.forEach((block) => fragment.append(makeReceiptBlock(block)));
+        if (!fragment.childNodes.length) fragment.append(makeReceiptBlock());
+        receiptEditor.replaceChildren(fragment);
+      }
+
+      function normalizeEditorBlocks() {
+        Array.from(receiptEditor.childNodes).forEach((node) => {
+          if (node.nodeType === Node.TEXT_NODE) {
+            const block = makeReceiptBlock();
+            block.replaceChildren(node);
+            receiptEditor.insertBefore(block, node.nextSibling);
+          } else if (node.nodeType === Node.ELEMENT_NODE && !node.classList.contains("receipt-block")) {
+            node.classList.add("receipt-block");
+            node.dataset.kind ||= "paragraph";
+            node.dataset.align ||= "left";
+            node.dataset.font ||= "a";
+            node.dataset.width ||= "1";
+            node.dataset.height ||= "1";
+          }
+        });
+        if (!receiptEditor.childNodes.length) receiptEditor.append(makeReceiptBlock());
+      }
+
+      function serializeInline(node) {
+        if (node.nodeType === Node.TEXT_NODE) return node.nodeValue.replaceAll("\u00a0", " ");
+        if (node.nodeType !== Node.ELEMENT_NODE) return "";
+        if (node.tagName === "BR") return "";
+        if (node.classList.contains("bullet-marker")) return node.dataset.source || "* ";
+
+        let result = Array.from(node.childNodes).map(serializeInline).join("");
+        if (node.tagName === "U") result = `++${result}++`;
+        if (node.classList.contains("receipt-reverse")) result = `==${result}==`;
+        return result;
+      }
+
+      function serializeBlock(block) {
+        const kind = block.dataset.kind || "paragraph";
+        if (kind === "rule") return "---";
+
+        const text = Array.from(block.childNodes).map(serializeInline).join("");
+
+        const directives = [];
+        if (block.dataset.align === "center") directives.push("center");
+        if (block.dataset.align === "right") directives.push("right");
+        if (block.dataset.font === "b") directives.push("font-b");
+        const width = Number(block.dataset.width || 1);
+        const height = Number(block.dataset.height || 1);
+        if (width === 2 && height === 2) directives.push("double-size");
+        return directives.length ? `::: ${directives.join(" ")}\n${text}\n:::` : text;
+      }
+
+      function updatePrintBoundary() {
+        const blocks = Array.from(receiptEditor.children)
+          .filter((block) => block.classList.contains("receipt-block"));
+        let contentHeight = 24;
+        if (blocks.length) {
+          const firstTop = blocks[0].offsetTop;
+          contentHeight = Math.max(
+            24,
+            ...blocks.map((block) => block.offsetTop + block.offsetHeight - firstTop),
+          );
+        }
+        const printHeight = contentHeight + 48;
+        printBoundary.style.height = `${printHeight}px`;
+        printBoundary.dataset.printHeight = String(printHeight);
+      }
+
+      function updateReceiptScale() {
+        const stageStyle = window.getComputedStyle(editorStage);
+        const availableWidth = editorStage.clientWidth
+          - parseFloat(stageStyle.paddingLeft)
+          - parseFloat(stageStyle.paddingRight);
+        const scale = mobileLayout.matches
+          ? Math.min(1, availableWidth / editorReceipt.offsetWidth)
+          : 1;
+        editorReceipt.style.transform = scale < 1 ? `scale(${scale})` : "none";
+        receiptScaleFrame.style.width = `${editorReceipt.offsetWidth * scale}px`;
+        receiptScaleFrame.style.height = `${editorReceipt.offsetHeight * scale}px`;
+        receiptScaleFrame.dataset.scale = scale.toFixed(4);
+      }
+
+      function syncSource() {
+        normalizeEditorBlocks();
+        content.value = Array.from(receiptEditor.children).map(serializeBlock).join("\n");
+        updatePrintBoundary();
+      }
+
+      let savedEditorRange = null;
+
+      function rememberEditorSelection() {
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount || !receiptEditor.contains(selection.anchorNode)) return;
+        savedEditorRange = selection.getRangeAt(0).cloneRange();
+        updateToolbarState();
+      }
+
+      function restoreEditorSelection() {
+        receiptEditor.focus();
+        if (!savedEditorRange) return;
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(savedEditorRange);
+      }
+
+      document.addEventListener("selectionchange", rememberEditorSelection);
+
+      function blockAtBoundary(container, offset, edge) {
+        const element = container?.nodeType === Node.ELEMENT_NODE ? container : container?.parentElement;
+        const containingBlock = element?.closest?.(".receipt-block");
+        if (containingBlock) return containingBlock;
+        if (container !== receiptEditor) return null;
+
+        const children = Array.from(receiptEditor.children);
+        const index = edge === "start" ? offset : offset - 1;
+        return children[Math.max(0, Math.min(index, children.length - 1))] || null;
+      }
+
+      function nodeTextLength(node) {
+        if (node.nodeType === Node.TEXT_NODE) return node.nodeValue.length;
+        if (node.nodeType !== Node.ELEMENT_NODE || node.tagName === "BR") return 0;
+        return Array.from(node.childNodes).reduce((length, child) => length + nodeTextLength(child), 0);
+      }
+
+      function textOffsetWithin(block, container, offset) {
+        if (container === block) {
+          return Array.from(block.childNodes)
+            .slice(0, offset)
+            .reduce((length, child) => length + nodeTextLength(child), 0);
+        }
+        const prefix = document.createRange();
+        prefix.selectNodeContents(block);
+        prefix.setEnd(container, offset);
+        return prefix.toString().length;
+      }
+
+      function selectionDetails() {
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount || !receiptEditor.contains(selection.anchorNode)) return null;
+        const range = selection.getRangeAt(0);
+        const start = blockAtBoundary(range.startContainer, range.startOffset, "start");
+        const end = blockAtBoundary(range.endContainer, range.endOffset, "end");
+        if (!start || !end) return null;
+        const blocks = Array.from(receiptEditor.children);
+        const startIndex = blocks.indexOf(start);
+        const endIndex = blocks.indexOf(end);
+        if (startIndex < 0 || endIndex < startIndex) return null;
+        const selected = blocks.slice(startIndex, endIndex + 1);
+        return {
+          range,
+          blocks: selected,
+          entries: selected.map((block, index) => ({
+            block,
+            start: index === 0
+              ? range.startContainer === receiptEditor
+                ? 0
+                : textOffsetWithin(block, range.startContainer, range.startOffset)
+              : 0,
+            end: index === selected.length - 1
+              ? range.endContainer === receiptEditor
+                ? nodeTextLength(block)
+                : textOffsetWithin(block, range.endContainer, range.endOffset)
+              : nodeTextLength(block),
+          })),
+        };
+      }
+
+      function selectedBlocks() {
+        return selectionDetails()?.blocks || [];
+      }
+
+      function blockSize(block) {
+        const font = block.dataset.font || "a";
+        const width = block.dataset.width || "1";
+        const height = block.dataset.height || "1";
+        if (font === "a" && width === "2" && height === "2") return "large";
+        if (font === "a" && width === "1" && height === "1") return "medium";
+        if (font === "b" && width === "1" && height === "1") return "small";
+        return "";
+      }
+
+      function setBlockSize(size) {
+        selectedBlocks()
+          .filter((block) => block.dataset.kind !== "rule")
+          .forEach((block) => {
+            block.dataset.font = size === "small" ? "b" : "a";
+            block.dataset.width = size === "large" ? "2" : "1";
+            block.dataset.height = size === "large" ? "2" : "1";
+          });
+      }
+
+      function setBlockAlignment(alignment) {
+        const blocks = selectedBlocks();
+        blocks.forEach((block) => { block.dataset.align = alignment; });
+      }
+
+      let selectedRule = null;
+
+      function clearSelectedRule() {
+        selectedRule?.classList.remove("selected");
+        selectedRule = null;
+      }
+
+      function selectRule(rule) {
+        clearSelectedRule();
+        selectedRule = rule;
+        selectedRule.classList.add("selected");
+        selectedRule.focus();
+        savedEditorRange = null;
+        window.getSelection()?.removeAllRanges();
+        updateToolbarState();
+      }
+
+      function deleteSelectedRule() {
+        if (!selectedRule?.isConnected) return;
+        const previous = selectedRule.previousElementSibling;
+        const following = selectedRule.nextElementSibling;
+        selectedRule.remove();
+        selectedRule = null;
+
+        let target = following?.dataset.kind !== "rule" ? following : null;
+        if (!target && previous?.dataset.kind !== "rule") target = previous;
+        if (!target) {
+          target = makeReceiptBlock();
+          receiptEditor.append(target);
+        }
+
+        receiptEditor.focus();
+        const range = document.createRange();
+        range.selectNodeContents(target);
+        range.collapse(false);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        rememberEditorSelection();
+        syncSource();
+        updateEditor();
+        updateToolbarState();
+        queueAutosave();
+      }
+
+      function insertRule() {
+        const blocks = selectedBlocks();
+        const current = blocks[blocks.length - 1];
+        if (!current) return;
+        const rule = makeReceiptBlock({ kind: "rule" });
+        const paragraph = makeReceiptBlock();
+        current.after(rule, paragraph);
+        const range = document.createRange();
+        range.setStart(paragraph, 0);
+        range.collapse(true);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+
+      function matchingInlineWrapper(node, command) {
+        const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+        if (!element) return null;
+        if (command === "underline") return element.closest("u");
+        if (command === "invert") return element.closest(".receipt-reverse");
+        return null;
+      }
+
+      function appendInlineSegment(segments, segment) {
+        if (!segment.text) return;
+        const previous = segments[segments.length - 1];
+        if (previous && previous.underline === segment.underline && previous.invert === segment.invert) {
+          previous.text += segment.text;
+        } else {
+          segments.push({ ...segment });
+        }
+      }
+
+      function inlineSegments(block) {
+        const segments = [];
+        const visit = (node, style) => {
+          if (node.nodeType === Node.TEXT_NODE) {
+            appendInlineSegment(segments, { text: node.nodeValue, ...style });
+            return;
+          }
+          if (node.nodeType !== Node.ELEMENT_NODE || node.tagName === "BR") return;
+          if (node.classList.contains("bullet-marker")) {
+            appendInlineSegment(segments, {
+              text: node.dataset.source || "* ",
+              underline: false,
+              invert: false,
+            });
+            return;
+          }
+          const nextStyle = {
+            underline: style.underline || node.tagName === "U",
+            invert: style.invert || node.classList.contains("receipt-reverse"),
+          };
+          Array.from(node.childNodes).forEach((child) => visit(child, nextStyle));
+        };
+        Array.from(block.childNodes).forEach((child) => visit(child, { underline: false, invert: false }));
+        return segments;
+      }
+
+      function renderInlineSegments(block, segments) {
+        block.replaceChildren();
+        const text = segments.map((segment) => segment.text).join("");
+        const checklist = checklistParts(text);
+        if (checklist) {
+          const marker = document.createElement("span");
+          marker.className = "checklist-marker";
+          marker.contentEditable = "false";
+          marker.setAttribute("role", "checkbox");
+          marker.setAttribute("aria-checked", String(checklist.checked));
+          marker.setAttribute("aria-label", checklist.checked ? "Completed task" : "Incomplete task");
+          marker.title = "Click to toggle; Ctrl+Enter also toggles";
+          marker.textContent = text.slice(0, checklist.markerEnd);
+          block.append(marker);
+          sliceInlineSegments(segments, checklist.markerEnd, text.length)
+            .forEach((segment) => block.append(makeInlineRun(segment)));
+        } else if (bulletParts(text)) {
+          const bullet = bulletParts(text);
+          const marker = document.createElement("span");
+          marker.className = "bullet-marker";
+          marker.contentEditable = "false";
+          marker.dataset.source = text.slice(0, bullet.markerEnd);
+          marker.textContent = `${bullet.indent}\u2022`;
+          block.append(marker);
+          sliceInlineSegments(segments, bullet.markerEnd, text.length)
+            .forEach((segment) => block.append(makeInlineRun(segment)));
+        } else {
+          segments.forEach((segment) => block.append(makeInlineRun(segment)));
+        }
+        if (!block.childNodes.length) block.append(document.createElement("br"));
+      }
+
+      function styleSelection(segments, start, end, command, enabled) {
+        const styled = [];
+        let cursor = 0;
+        segments.forEach((segment) => {
+          const segmentStart = cursor;
+          const segmentEnd = cursor + segment.text.length;
+          if (end <= segmentStart || start >= segmentEnd) {
+            appendInlineSegment(styled, segment);
+            cursor = segmentEnd;
+            return;
+          }
+          const selectedStart = Math.max(start, segmentStart);
+          const selectedEnd = Math.min(end, segmentEnd);
+          const addSlice = (from, to, selected) => {
+            if (to <= from) return;
+            const next = { ...segment, text: segment.text.slice(from - segmentStart, to - segmentStart) };
+            if (selected) next[command] = enabled;
+            appendInlineSegment(styled, next);
+          };
+          addSlice(segmentStart, selectedStart, false);
+          addSlice(selectedStart, selectedEnd, true);
+          addSlice(selectedEnd, segmentEnd, false);
+          cursor = segmentEnd;
+        });
+        return styled;
+      }
+
+      function sliceInlineSegments(segments, start, end) {
+        const sliced = [];
+        let cursor = 0;
+        segments.forEach((segment) => {
+          const segmentEnd = cursor + segment.text.length;
+          const sliceStart = Math.max(start, cursor);
+          const sliceEnd = Math.min(end, segmentEnd);
+          if (sliceStart < sliceEnd) {
+            appendInlineSegment(sliced, {
+              ...segment,
+              text: segment.text.slice(sliceStart - cursor, sliceEnd - cursor),
+            });
+          }
+          cursor = segmentEnd;
+        });
+        return sliced;
+      }
+
+      function checklistParts(text) {
+        const match = text.replaceAll("\u00a0", " ").match(/^([ ]*-[ ]+\[)([ xX])(\])([ ]*)(.*)$/);
+        if (!match) return null;
+        return {
+          checked: match[2].toLowerCase() === "x",
+          statusOffset: match[1].length,
+          markerEnd: match[1].length + 2,
+          prefixLength: match[1].length + 2 + match[4].length,
+          body: match[5],
+          indent: match[1].match(/^ */)[0],
+        };
+      }
+
+      function bulletParts(text) {
+        const match = text.replaceAll("\u00a0", " ").match(/^([ ]*)\*([ ]+)(.*)$/);
+        if (!match) return null;
+        return {
+          indent: match[1],
+          markerEnd: match[1].length + 1,
+          prefixLength: match[1].length + 1 + match[2].length,
+          body: match[3],
+        };
+      }
+
+      function dashListParts(text) {
+        const match = text.replaceAll("\u00a0", " ").match(/^([ ]*)-([ ]+)(.*)$/);
+        if (!match) return null;
+        return {
+          indent: match[1],
+          prefixLength: match[1].length + 1 + match[2].length,
+          body: match[3],
+        };
+      }
+
+      function toggleBulletList() {
+        const details = selectionDetails();
+        const entries = details?.entries.filter(({ block }) => block.dataset.kind !== "rule") || [];
+        if (!entries.length) return;
+
+        const removeBullets = entries.every(({ block }) => {
+          const text = inlineSegments(block).map((segment) => segment.text).join("");
+          return Boolean(bulletParts(text));
+        });
+        const collapsed = details.range.collapsed && entries.length === 1;
+        let collapsedOffset = entries[0].start;
+
+        entries.forEach(({ block, start }) => {
+          const segments = inlineSegments(block);
+          const text = segments.map((segment) => segment.text).join("").replaceAll("\u00a0", " ");
+          const bullet = bulletParts(text);
+
+          if (removeBullets && bullet) {
+            const markerLength = bullet.prefixLength - bullet.indent.length;
+            renderInlineSegments(block, [
+              { text: bullet.indent, underline: false, invert: false },
+              ...sliceInlineSegments(segments, bullet.prefixLength, text.length),
+            ]);
+            if (collapsed) collapsedOffset = Math.max(bullet.indent.length, start - markerLength);
+            return;
+          }
+
+          if (bullet) return;
+
+          const checklist = checklistParts(text);
+          const dash = checklist ? null : dashListParts(text);
+          const indent = checklist?.indent ?? dash?.indent ?? text.match(/^ */)[0];
+          const bodyStart = checklist?.prefixLength ?? dash?.prefixLength ?? indent.length;
+          const prefix = `${indent}* `;
+          renderInlineSegments(block, [
+            { text: prefix, underline: false, invert: false },
+            ...sliceInlineSegments(segments, bodyStart, text.length),
+          ]);
+          if (collapsed) collapsedOffset = prefix.length + Math.max(0, start - bodyStart);
+        });
+
+        if (collapsed) {
+          selectTextOffsets(entries[0].block, collapsedOffset, entries[0].block, collapsedOffset);
+        } else {
+          const first = entries[0].block;
+          const last = entries[entries.length - 1].block;
+          selectTextOffsets(first, 0, last, nodeTextLength(last));
+        }
+      }
+
+      function setChecklistChecked(block, checked, caretOffset) {
+        const segments = inlineSegments(block);
+        const text = segments.map((segment) => segment.text).join("");
+        const checklist = checklistParts(text);
+        if (!checklist) return false;
+
+        renderInlineSegments(block, [
+          ...sliceInlineSegments(segments, 0, checklist.statusOffset),
+          { text: checked ? "x" : " ", underline: false, invert: false },
+          ...sliceInlineSegments(segments, checklist.statusOffset + 1, text.length),
+        ]);
+        const restoredOffset = Math.min(caretOffset, nodeTextLength(block));
+        selectTextOffsets(block, restoredOffset, block, restoredOffset);
+        receiptEditor.dispatchEvent(new Event("input", { bubbles: true }));
+        return true;
+      }
+
+      function toggleChecklistAtSelection(event) {
+        if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || event.isComposing) return false;
+        const details = selectionDetails();
+        if (!details?.range.collapsed || details.entries.length !== 1) return false;
+        const { block, start } = details.entries[0];
+        const checklist = checklistParts(inlineSegments(block).map((segment) => segment.text).join(""));
+        if (!checklist) return false;
+
+        event.preventDefault();
+        return setChecklistChecked(block, !checklist.checked, start);
+      }
+
+      function decorateListMarkerAtCaret() {
+        const details = selectionDetails();
+        if (!details?.range.collapsed || details.entries.length !== 1) return;
+        const { block, start } = details.entries[0];
+        if (block.querySelector(".checklist-marker, .bullet-marker")) return;
+        const segments = inlineSegments(block);
+        const text = segments.map((segment) => segment.text).join("");
+        const checklist = checklistParts(text);
+        const bullet = bulletParts(text);
+        if (
+          (!checklist || checklist.prefixLength <= checklist.markerEnd)
+          && !bullet
+        ) return;
+        renderInlineSegments(block, segments);
+        selectTextOffsets(block, start, block, start);
+      }
+
+      function insertStyledPlaceholder(segments, offset, style) {
+        const inserted = [];
+        let cursor = 0;
+        let added = false;
+        segments.forEach((segment) => {
+          const next = cursor + segment.text.length;
+          if (!added && offset >= cursor && offset <= next) {
+            const split = offset - cursor;
+            appendInlineSegment(inserted, { ...segment, text: segment.text.slice(0, split) });
+            appendInlineSegment(inserted, { text: "text", ...style });
+            appendInlineSegment(inserted, { ...segment, text: segment.text.slice(split) });
+            added = true;
+          } else {
+            appendInlineSegment(inserted, segment);
+          }
+          cursor = next;
+        });
+        if (!added) appendInlineSegment(inserted, { text: "text", ...style });
+        return inserted;
+      }
+
+      function pointAtTextOffset(block, requestedOffset) {
+        const textNodes = [];
+        const visit = (node) => {
+          if (node.nodeType === Node.TEXT_NODE) textNodes.push(node);
+          else Array.from(node.childNodes || []).forEach(visit);
+        };
+        visit(block);
+        let remaining = requestedOffset;
+        for (const node of textNodes) {
+          if (remaining <= node.nodeValue.length) return [node, remaining];
+          remaining -= node.nodeValue.length;
+        }
+        if (textNodes.length) {
+          const last = textNodes[textNodes.length - 1];
+          return [last, last.nodeValue.length];
+        }
+        return [block, 0];
+      }
+
+      function selectTextOffsets(startBlock, startOffset, endBlock, endOffset) {
+        const [startNode, start] = pointAtTextOffset(startBlock, startOffset);
+        const [endNode, end] = pointAtTextOffset(endBlock, endOffset);
+        const range = document.createRange();
+        range.setStart(startNode, start);
+        range.setEnd(endNode, end);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+
+      function selectionHasInlineStyle(details, command) {
+        let foundText = false;
+        let allStyled = true;
+        details.entries
+          .filter(({ block }) => block.dataset.kind !== "rule")
+          .forEach(({ block, start, end }) => {
+            let cursor = 0;
+            inlineSegments(block).forEach((segment) => {
+              const segmentEnd = cursor + segment.text.length;
+              if (Math.max(start, cursor) < Math.min(end, segmentEnd)) {
+                foundText = true;
+                if (!segment[command]) allStyled = false;
+              }
+              cursor = segmentEnd;
+            });
+          });
+        return foundText && allStyled;
+      }
+
+      function applyInlineFormatting(command) {
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount || !receiptEditor.contains(selection.anchorNode)) return;
+        let details = selectionDetails();
+        if (!details) {
+          const firstBlock = receiptEditor.querySelector('.receipt-block:not([data-kind="rule"])');
+          if (!firstBlock) return;
+          const range = document.createRange();
+          range.setStart(firstBlock, 0);
+          range.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          details = selectionDetails();
+        }
+        if (!details) return;
+
+        const entries = details.entries.filter(({ block }) => block.dataset.kind !== "rule");
+        if (!entries.length) return;
+
+        if (details.range.collapsed) {
+          const { block, start } = entries[0];
+          const caretStyle = {
+            underline: Boolean(matchingInlineWrapper(details.range.startContainer, "underline")),
+            invert: Boolean(matchingInlineWrapper(details.range.startContainer, "invert")),
+          };
+          caretStyle[command] = !caretStyle[command];
+          renderInlineSegments(block, insertStyledPlaceholder(inlineSegments(block), start, caretStyle));
+          selectTextOffsets(block, start, block, start + 4);
+          return;
+        }
+
+        const enabled = !selectionHasInlineStyle(details, command);
+        entries.forEach(({ block, start, end }) => {
+          renderInlineSegments(block, styleSelection(inlineSegments(block), start, end, command, enabled));
+        });
+        const first = entries[0];
+        const last = entries[entries.length - 1];
+        selectTextOffsets(first.block, first.start, last.block, last.end);
+      }
+
+      function updateToolbarState() {
+        const details = selectionDetails();
+        const blocks = details?.blocks || [];
+
+        document.querySelectorAll('.markdown-toolbar button[aria-pressed]').forEach((button) => {
+          let pressed = false;
+          if (blocks.length && button.dataset.tool === "size") {
+            pressed = blocks.every((block) => blockSize(block) === button.dataset.size);
+          } else if (blocks.length && button.dataset.tool === "alignment") {
+            pressed = blocks.every((block) => block.dataset.align === button.dataset.align);
+          } else if (blocks.length && button.dataset.tool === "bullet") {
+            const paragraphs = blocks.filter((block) => block.dataset.kind !== "rule");
+            pressed = Boolean(paragraphs.length) && paragraphs.every((block) => {
+              const text = inlineSegments(block).map((segment) => segment.text).join("");
+              return Boolean(bulletParts(text));
+            });
+          } else if (blocks.length && button.dataset.tool === "inline") {
+            const command = button.dataset.command;
+            pressed = details.range.collapsed
+              ? Boolean(matchingInlineWrapper(details.range.startContainer, command))
+              : selectionHasInlineStyle(details, command);
+          }
+          button.setAttribute("aria-pressed", String(pressed));
+        });
+      }
+
+      function continueListOnEnter(event) {
+        if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return false;
+        const details = selectionDetails();
+        if (!details?.range.collapsed || details.entries.length !== 1) return false;
+
+        const { block, start } = details.entries[0];
+        if (block.dataset.kind === "rule") return false;
+        const segments = inlineSegments(block);
+        const text = segments.map((segment) => segment.text).join("").replaceAll("\u00a0", " ");
+        const checklist = checklistParts(text);
+        const bullet = checklist ? null : bulletParts(text);
+        const match = checklist || bullet ? null : text.match(/^([ ]*-[ ]+)(.*)$/);
+        const prefixLength = checklist?.prefixLength || bullet?.prefixLength || match?.[1].length;
+        const body = checklist?.body ?? bullet?.body ?? match?.[2];
+        if (!prefixLength || start < prefixLength) return false;
+
+        event.preventDefault();
+        if (!body) {
+          renderInlineSegments(block, []);
+          selectTextOffsets(block, 0, block, 0);
+        } else {
+          const prefix = checklist
+            ? `${checklist.indent}- [ ] `
+            : bullet
+              ? `${bullet.indent}* `
+              : `${match[1].match(/^ */)[0]}- `;
+          const before = sliceInlineSegments(segments, 0, start);
+          const after = sliceInlineSegments(segments, start, text.length);
+          renderInlineSegments(block, before);
+
+          const nextBlock = makeReceiptBlock({
+            align: block.dataset.align,
+            style: {
+              font: block.dataset.font,
+              width: Number(block.dataset.width),
+              height: Number(block.dataset.height),
+            },
+          });
+          renderInlineSegments(nextBlock, [
+            { text: prefix, underline: false, invert: false },
+            ...after,
+          ]);
+          block.after(nextBlock);
+          selectTextOffsets(nextBlock, prefix.length, nextBlock, prefix.length);
+        }
+
+        receiptEditor.dispatchEvent(new Event("input", { bubbles: true }));
+        return true;
+      }
+
+      document.querySelectorAll(".markdown-toolbar button[data-tool]").forEach((button) => {
+        button.addEventListener("mousedown", (event) => event.preventDefault());
+        button.addEventListener("click", () => {
+          clearBeautifyUndo();
+          restoreEditorSelection();
+          if (button.dataset.tool === "inline") {
+            const command = button.dataset.command;
+            applyInlineFormatting(command);
+          } else if (button.dataset.tool === "size") {
+            setBlockSize(button.dataset.size);
+          } else if (button.dataset.tool === "alignment") {
+            setBlockAlignment(button.dataset.align);
+          } else if (button.dataset.tool === "bullet") {
+            toggleBulletList();
+          } else if (button.dataset.tool === "rule") {
+            insertRule();
+          }
+          rememberEditorSelection();
+          syncSource();
+          updateEditor();
+          updateToolbarState();
+          queueAutosave();
+        });
+      });
+
+      function updateEditor() {
+        const normalizedTitle = titleInput.value.trim().replace(/\.md$/i, "").trim();
         const hasInvalidTitle = !normalizedTitle || normalizedTitle === "." || normalizedTitle === ".." || /[\\/]/.test(normalizedTitle);
         titleInput.setCustomValidity(hasInvalidTitle ? "Enter a title without slashes." : "");
 
         const hasInvalidCharacters = /[^\x20-\x7E\r\n]/.test(content.value);
         asciiWarning.hidden = !hasInvalidCharacters;
-        content.setCustomValidity(hasInvalidCharacters ? "Use printable ASCII characters only." : "");
 
         const changed = hasUnsavedChanges();
         saveState.textContent = changed ? "Unsaved changes" : "Ready";
         saveState.classList.toggle("unsaved", changed);
+        saveState.classList.remove("saved");
       }
 
-      content.addEventListener("input", updateEditor);
-      content.addEventListener("click", updateEditor);
-      content.addEventListener("keyup", updateEditor);
+      receiptEditor.addEventListener("input", () => {
+        if (!applyingBeautify) clearBeautifyUndo();
+        decorateListMarkerAtCaret();
+        syncSource();
+        updateEditor();
+        updateToolbarState();
+        queueAutosave();
+      });
+      receiptEditor.addEventListener("click", (event) => {
+        const marker = event.target.closest(".checklist-marker");
+        if (marker) {
+          const block = marker.closest(".receipt-block");
+          const checklist = checklistParts(inlineSegments(block).map((segment) => segment.text).join(""));
+          if (checklist) setChecklistChecked(block, !checklist.checked, checklist.prefixLength);
+          clearSelectedRule();
+          updateEditor();
+          return;
+        }
+        const rule = event.target.closest('.receipt-block[data-kind="rule"]');
+        if (rule) {
+          selectRule(rule);
+        } else {
+          clearSelectedRule();
+        }
+        updateEditor();
+      });
+      receiptEditor.addEventListener("keyup", updateEditor);
+      receiptEditor.addEventListener("paste", (event) => {
+        event.preventDefault();
+        document.execCommand("insertText", false, event.clipboardData.getData("text/plain"));
+      });
       titleInput.addEventListener("input", () => {
         updateProposedLocation();
         updateEditor();
+        if (currentNotePath()) autosaveEnabled = true;
+        queueAutosave();
       });
-      [...fontInputs, ...sizeInputs].forEach((input) => input.addEventListener("change", updateEditor));
-      form.addEventListener("submit", () => { saveState.textContent = "Working…"; });
+      form.addEventListener("submit", (event) => {
+        window.clearTimeout(autosaveTimer);
+        if (autosaveInFlight && !formSubmitting) {
+          event.preventDefault();
+          pendingSubmitter = event.submitter || saveButton;
+          saveState.textContent = "Finishing save…";
+          return;
+        }
+        formSubmitting = true;
+        syncSource();
+        saveState.textContent = "Working…";
+      });
+      receiptEditor.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && toggleChecklistAtSelection(event)) return;
+        if (event.key === "Enter" && continueListOnEnter(event)) return;
+        if (event.key !== "Tab") return;
+        event.preventDefault();
+        if (!event.shiftKey) document.execCommand("insertText", false, "    ");
+        receiptEditor.dispatchEvent(new Event("input", { bubbles: true }));
+      });
       document.addEventListener("keydown", (event) => {
+        if (selectedRule && (event.key === "Delete" || event.key === "Backspace")) {
+          event.preventDefault();
+          clearBeautifyUndo();
+          deleteSelectedRule();
+          return;
+        }
         if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
           event.preventDefault();
           form.requestSubmit(saveButton);
         }
       });
+      renderEditorDocument(initialEditorState);
+      syncSource();
+      initialValue = currentValue();
       updateProposedLocation();
       updateEditor();
       updatePrinterStatus();
-      window.setInterval(updatePrinterStatus, 15000);
+      if (mobileLayout.matches) receiptEditor.blur();
+      else receiptEditor.focus();
+      const receiptResizeObserver = new ResizeObserver(updateReceiptScale);
+      receiptResizeObserver.observe(editorReceipt);
+      mobileLayout.addEventListener("change", updateReceiptScale);
+      window.addEventListener("resize", () => {
+        updatePrintBoundary();
+        updateReceiptScale();
+      });
+      document.fonts?.ready.then(() => {
+        updatePrintBoundary();
+        updateReceiptScale();
+      });
+      updateReceiptScale();
+      window.setInterval(updatePrinterStatus, 60000);
+      window.setInterval(refreshScheduleStatus, 30000);
     </script>
   </body>
 </html>

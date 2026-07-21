@@ -1,45 +1,109 @@
 # Receipt Notes
 
-A minimal, single-user Flask app for saving 42-column text notes and printing them to a network Epson TM-T70II receipt printer.
+A single-user Flask editor for receipt-sized notes. Notes are plain ASCII `.md` files in a filesystem vault and print to an Epson TM-T70II with native ESC/POS text. There is no database or authentication; access is intended to stay within a private tailnet.
 
-## Setup
+## Run
 
 ```bash
 cd /home/grs/Projects/receipt-notes
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-Set the printer address and choose the directory that acts as the vault:
-
-```bash
-export PRINTER_HOST=192.168.1.100
-export VAULT_ROOT=/home/grs/Projects/receipt-notes/vault
 python app.py
 ```
 
-The app listens only on `127.0.0.1:8000`. In another terminal, expose it privately to your tailnet:
+Optional environment variables:
+
+- `VAULT_ROOT`: notes directory; defaults to `vault/`
+- `APP_HOST`: listening address; defaults to this machine's Tailscale IP
+- `APP_PORT`: listening port; defaults to `8000`
+- `PRINTER_TYPE`: `usb` or `network`; defaults to `network`
+- `PRINTER_USB_VENDOR_ID`: USB vendor ID; defaults to Epson's `0x04b8`
+- `PRINTER_USB_PRODUCT_ID`: optional USB product ID for exact device matching
+- `PRINTER_HOST`: printer IP address when using `network`; editing works without it
+- `APP_TIMEZONE`: scheduled-print timezone; defaults to `US/Mountain`
+- `OLLAMA_URL`: local Ollama address; defaults to `http://127.0.0.1:11434`
+- `OLLAMA_MODEL`: Beautify model; defaults to `gemma4:12b`
+- `OLLAMA_TIMEOUT_SECONDS`: Beautify timeout; defaults to `90`
+
+The app listens on this machine's Tailscale address at `http://100.71.126.126:8000`.
+
+## Boot service
+
+The production service uses Waitress, starts the print scheduler in the same process, and waits for Tailscale before binding. It runs as a systemd user service; lingering must be enabled so the user manager starts at boot. This machine already has lingering enabled for `grs`.
+
+Install or update the service:
 
 ```bash
-tailscale serve --bg localhost:8000
+.venv/bin/pip install -r requirements.txt
+install -Dm600 systemd/receipt-notes.env.example ~/.config/receipt-notes/environment
+install -Dm644 systemd/receipt-notes.service ~/.config/systemd/user/receipt-notes.service
+systemctl --user daemon-reload
+systemctl --user enable --now receipt-notes.service
 ```
 
-Use `tailscale serve status` to see its tailnet URL.
+Edit `~/.config/receipt-notes/environment` when the Tailscale or printer IP changes. Check the service and follow its logs with:
+
+```bash
+systemctl --user status receipt-notes.service
+journalctl --user -u receipt-notes.service -f
+```
+
+After pulling application updates, reinstall dependencies if needed and run `systemctl --user restart receipt-notes.service`.
+
+### USB printer
+
+This installation uses the TM-T70II's UB-U05 USB interface (`04b8:0202`). The service
+environment selects it with `PRINTER_TYPE=usb`, `PRINTER_USB_VENDOR_ID=0x04b8`, and
+`PRINTER_USB_PRODUCT_ID=0x0202`. The service user must have read/write permission for
+that USB device, normally through a device-specific udev rule.
+
+## Receipt format
+
+Notes use a small receipt markup, not full Markdown:
+
+```text
+Plain text
+* round bullet
+- [ ] unfinished task
+- [x] finished task
+++underlined++
+==reverse text==
+---
+
+::: center double-size
+Large centered text
+:::
+```
+
+Block directives may combine `font-b`, `center`, `right`, and `double-size`, but cannot nest. Defaults are Font A, normal size, and left alignment. In the toolbar, Large is Font A at 2× size, Medium is Font A, and Small is Font B.
+
+Type `* ` at the start of a line or use the Bullet toolbar button. The button toggles the current line or every selected line. Pressing Enter continues bullet lists; pressing Enter on an empty bullet ends the list.
+
+Checklist markers can be clicked or toggled with `Ctrl+Enter`/`Cmd+Enter`. Pressing Enter continues with a new unchecked item; pressing Enter again on an empty item ends the checklist.
+
+## Local AI
+
+Beautify uses Gemma 4 through a separate, local Ollama process. Install the model once, then keep Ollama running:
+
+~~~bash
+ollama pull gemma4:12b
+ollama serve
+~~~
+
+Ollama must listen on this machine's loopback interface. Beautify works on the current editor contents, applies only supported receipt formatting, and never prints automatically. Use Undo Beautify immediately if needed; otherwise the result follows the normal autosave behavior.
 
 ## Notes
 
-- `VAULT_ROOT` is the source of truth. The sidebar is rebuilt from its real directories and `.txt` files on every page load.
-- New notes default to the title `untitled` at the vault root. The tree carries the directory location and the app adds the `.txt` extension internally.
-- Changing a saved note's title renames its source file without changing its tree directory.
-- Dragging files or directories in the tree moves the underlying filesystem item.
-- Delete controls in the tree remove notes or entire folders after an explicit confirmation.
-- Notes accept printable ASCII and newlines and are permanently wrapped at 42 columns, matching the TM-T70II's standard Font A on 80 mm paper.
-- **Save & Print** saves first, then sends the exact saved text through `python-escpos` and cuts the receipt.
-- Printing explicitly selects the default ESC/POS capability profile and standard-size, left-aligned Font A.
-- The printer is expected to accept ESC/POS over its default network port, 9100.
+- The vault is the source of truth. The file tree creates, moves, and deletes real directories and `.md` files.
+- Today and Tomorrow create or open dated notes under `daily/YYYY/MM Month/`.
+- Named notes autosave shortly after content, formatting, or title changes stop. Save remains available for an immediate manual save.
+- Saving is atomic. Printing saves first, sends native text and styles over the configured USB or TCP `9100` transport, then cuts.
+- Saved notes can be scheduled to print once. Schedules are hidden sidecar files, require the app to remain running, and are consumed after one attempt.
+- Schedules missed while the app is stopped expire when it starts again.
+- Printer status refreshes every 60 seconds and can also be refreshed manually.
 
-Run the tests with:
+## Tests
 
 ```bash
 pytest -q
